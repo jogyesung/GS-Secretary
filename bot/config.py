@@ -43,6 +43,10 @@ CLAUDE_SYSTEM_PROMPT = os.getenv(
 )
 CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "4096"))
 
+# Gemini API (실시간 웹 검색용)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
 # 실행 모드: cloud (Drive+메모+리마인더), local (PC파일만), all (전부)
 RUN_MODE = os.getenv("RUN_MODE", "all").lower()
 

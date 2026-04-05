@@ -9,7 +9,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from bot.config import TELEGRAM_BOT_TOKEN, LOG_LEVEL, TEMP_DOWNLOAD_PATH, RUN_MODE, ANTHROPIC_API_KEY
+from bot.config import TELEGRAM_BOT_TOKEN, LOG_LEVEL, TEMP_DOWNLOAD_PATH, RUN_MODE, ANTHROPIC_API_KEY, GEMINI_API_KEY
 from bot.database import init_db
 from bot.handlers.start import start_command, help_command, status_command
 from bot.handlers.chat import handle_chat_message, clear_command
@@ -149,6 +149,14 @@ def main():
         _register_local_handlers(app)
 
     _register_file_handler(app)
+
+    # === Gemini 실시간 검색 ===
+    if GEMINI_API_KEY:
+        from bot.handlers.search import search_command
+        app.add_handler(CommandHandler("search", search_command))
+        logger.info("Gemini 실시간 검색 핸들러 등록")
+    else:
+        logger.warning("GEMINI_API_KEY 미설정 - 실시간 검색 기능 비활성화")
 
     # === Claude AI 대화 ===
     if ANTHROPIC_API_KEY:

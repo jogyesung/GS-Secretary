@@ -2,7 +2,7 @@
 
 from telegram import Update
 from telegram.ext import ContextTypes
-from bot.config import RUN_MODE, ANTHROPIC_API_KEY
+from bot.config import RUN_MODE, ANTHROPIC_API_KEY, GEMINI_API_KEY
 from bot.middleware.auth_middleware import authorized_only
 
 
@@ -52,10 +52,18 @@ def _build_help_text() -> str:
             "/pc\\_delete <경로> - 파일 삭제\n"
         )
 
+    if GEMINI_API_KEY:
+        sections.append(
+            "*실시간 웹 검색*\n"
+            "/search <질문> - 실시간 웹 검색 (Gemini)\n"
+            "  예: /search 오늘 코스피 지수\n"
+        )
+
     if ANTHROPIC_API_KEY:
         sections.append(
-            "*Claude AI 대화*\n"
-            "그냥 메시지를 보내면 Claude가 답변합니다.\n"
+            "*AI 대화*\n"
+            "그냥 메시지를 보내면 카리나가 답변합니다.\n"
+            "대화 중 자동으로 PC 파일 접근, 웹 검색도 합니다.\n"
             "/clear - 대화 히스토리 초기화\n"
         )
 

@@ -4,7 +4,7 @@ import json
 import anthropic
 from bot.config import (
     ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_SYSTEM_PROMPT,
-    CLAUDE_MAX_TOKENS, ALLOWED_PATHS, RUN_MODE,
+    CLAUDE_MAX_TOKENS, ALLOWED_PATHS, RUN_MODE, GEMINI_API_KEY,
 )
 
 # 사용자별 대화 히스토리 (메모리 내 관리)
@@ -97,6 +97,21 @@ MEMO_TOOLS = [
     },
 ]
 
+# 웹 검색 도구 (Gemini API 키가 있을 때만)
+SEARCH_TOOLS = [
+    {
+        "name": "web_search",
+        "description": "실시간 웹 검색을 수행합니다. 최신 뉴스, 날씨, 주가, 실시간 정보 등을 검색할 때 사용합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "검색할 내용 (예: '오늘 코스피 지수', '최신 AI 뉴스')"}
+            },
+            "required": ["query"]
+        }
+    },
+]
+
 
 def _build_tools() -> list[dict]:
     """현재 모드에 따라 사용 가능한 도구 목록 생성"""
@@ -105,6 +120,8 @@ def _build_tools() -> list[dict]:
         tools.extend(PC_TOOLS)
     if RUN_MODE in ("cloud", "all"):
         tools.extend(MEMO_TOOLS)
+    if GEMINI_API_KEY:
+        tools.extend(SEARCH_TOOLS)
     return tools
 
 
@@ -175,6 +192,14 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
             for m in memos:
                 result.append(f"#{m['id']} [{m['created_at'][:16]}] {m['content']}")
             return "\n".join(result)
+
+        elif tool_name == "web_search":
+            from bot.services.gemini_service import search
+            search_result = await search(tool_input["query"])
+            text = search_result["answer"]
+            if search_result["sources"]:
+                text += "\n\n출처:\n" + "\n".join(search_result["sources"][:5])
+            return text
 
         else:
             return f"알 수 없는 도구: {tool_name}"

@@ -181,6 +181,14 @@ def _build_system_prompt() -> str:
             "\n사용자가 '내 자료', '내 문서', '보고서', '파일' 등을 언급하면 Drive를 먼저 검색하세요."
         )
 
+    extra += (
+        "\n\n[중요 규칙]"
+        "\n- 도구 실행이 실패하더라도 절대 '할 수 없습니다', '검색이 안 됩니다'라고만 답하지 마세요."
+        "\n- 웹 검색이 실패하면, 반드시 당신이 알고 있는 지식으로 직접 답변하세요."
+        "\n- '다른 사이트에서 확인하세요', '직접 검색해보세요' 같은 떠넘기기는 절대 하지 마세요."
+        "\n- 사용자는 당신에게 답을 원하는 것이지, 다른 곳으로 안내받길 원하는 게 아닙니다."
+    )
+
     return CLAUDE_SYSTEM_PROMPT + extra
 
 
@@ -284,9 +292,9 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 if search_result["sources"]:
                     text += "\n\n출처:\n" + "\n".join(search_result["sources"][:5])
                 return text
-            except Exception as e:
-                # DuckDuckGo까지 모두 실패한 경우
-                return f"웹 검색을 수행할 수 없습니다 ({e}). 검색 없이 알고 있는 정보로 답변해주세요."
+            except Exception:
+                # DuckDuckGo까지 모두 실패한 경우 → Claude가 자체 지식으로 답변하도록
+                return "검색 엔진에 일시적 문제가 있습니다. 반드시 당신이 알고 있는 지식으로 직접 답변하세요. 절대 '검색할 수 없다'거나 '다른 곳에서 확인하라'고 하지 마세요."
 
         else:
             return f"알 수 없는 도구: {tool_name}"

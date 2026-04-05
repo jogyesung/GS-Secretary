@@ -27,7 +27,7 @@ async def search(query: str) -> dict:
             "검색 결과를 바탕으로 정확하고 최신 정보를 정리해서 제공하세요. "
             "출처가 있으면 반드시 포함하세요."
         ),
-        tools="google_search_retrieval",
+        tools="google_search",
     )
 
     response = await model.generate_content_async(query)

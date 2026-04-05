@@ -97,6 +97,44 @@ MEMO_TOOLS = [
     },
 ]
 
+# Google Drive 도구 (cloud/all 모드)
+DRIVE_TOOLS = [
+    {
+        "name": "drive_search",
+        "description": "Google Drive에서 파일을 검색합니다. 파일 이름과 내용에서 키워드를 검색합니다. 사용자의 Drive 자료를 참고해야 할 때 사용하세요.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "검색할 키워드 (예: '회의록', '프로젝트 계획서', '매출 보고서')"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "drive_read",
+        "description": "Google Drive 파일의 내용을 읽습니다. drive_search로 찾은 파일의 ID를 사용합니다. Google Docs, Sheets, 텍스트 파일 등을 읽을 수 있습니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "file_id": {"type": "string", "description": "읽을 파일의 Google Drive ID"},
+                "max_chars": {"type": "integer", "description": "최대 읽을 글자 수 (기본 15000)", "default": 15000}
+            },
+            "required": ["file_id"]
+        }
+    },
+    {
+        "name": "drive_list",
+        "description": "Google Drive 폴더의 파일 목록을 조회합니다. folder_id를 생략하면 루트 폴더를 조회합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "folder_id": {"type": "string", "description": "폴더 ID (기본: 루트)", "default": "root"},
+                "page_size": {"type": "integer", "description": "최대 조회 수 (기본 20)", "default": 20}
+            }
+        }
+    },
+]
+
 # 웹 검색 도구 (Gemini API 키가 있을 때만)
 SEARCH_TOOLS = [
     {
@@ -120,6 +158,7 @@ def _build_tools() -> list[dict]:
         tools.extend(PC_TOOLS)
     if RUN_MODE in ("cloud", "all"):
         tools.extend(MEMO_TOOLS)
+        tools.extend(DRIVE_TOOLS)
     if GEMINI_API_KEY:
         tools.extend(SEARCH_TOOLS)
     return tools
@@ -127,12 +166,22 @@ def _build_tools() -> list[dict]:
 
 def _build_system_prompt() -> str:
     """허용 경로 정보를 포함한 시스템 프롬프트 생성"""
-    paths_info = ""
+    extra = ""
     if ALLOWED_PATHS:
         paths_list = ", ".join(str(p) for p in ALLOWED_PATHS)
-        paths_info = f"\n\n접근 가능한 PC 경로: {paths_list}"
+        extra += f"\n\n접근 가능한 PC 경로: {paths_list}"
 
-    return CLAUDE_SYSTEM_PROMPT + paths_info
+    if RUN_MODE in ("cloud", "all"):
+        extra += (
+            "\n\n[Google Drive 활용 지침]"
+            "\n사용자가 질문하면, 관련 자료가 Google Drive에 있을 수 있습니다."
+            "\n1. drive_search로 관련 파일을 검색하세요."
+            "\n2. 찾은 파일의 ID로 drive_read를 사용해 내용을 읽으세요."
+            "\n3. 파일 내용을 바탕으로 정확하게 답변하세요."
+            "\n사용자가 '내 자료', '내 문서', '보고서', '파일' 등을 언급하면 Drive를 먼저 검색하세요."
+        )
+
+    return CLAUDE_SYSTEM_PROMPT + extra
 
 
 # === 도구 실행 함수 ===
@@ -192,6 +241,40 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
             for m in memos:
                 result.append(f"#{m['id']} [{m['created_at'][:16]}] {m['content']}")
             return "\n".join(result)
+
+        elif tool_name == "drive_search":
+            from bot.services.drive_service import fulltext_search
+            files = await fulltext_search(tool_input["query"])
+            if not files:
+                return f"'{tool_input['query']}'에 대한 Drive 검색 결과가 없습니다."
+            result = []
+            for f in files:
+                mime = f.get("mimeType", "")
+                modified = f.get("modifiedTime", "")[:16]
+                size = f.get("size", "")
+                size_str = f" ({size} bytes)" if size else ""
+                result.append(f"• {f['name']} [ID: {f['id']}] ({mime}){size_str} 수정: {modified}")
+            return f"Drive 검색 결과 ({len(files)}개):\n" + "\n".join(result)
+
+        elif tool_name == "drive_read":
+            from bot.services.drive_service import read_file_content
+            max_chars = tool_input.get("max_chars", 15000)
+            file_data = await read_file_content(tool_input["file_id"], max_chars=max_chars)
+            return f"파일: {file_data['name']} ({file_data['mime_type']})\n\n{file_data['content']}"
+
+        elif tool_name == "drive_list":
+            from bot.services.drive_service import list_files
+            folder_id = tool_input.get("folder_id", "root")
+            page_size = tool_input.get("page_size", 20)
+            files = await list_files(folder_id, page_size)
+            if not files:
+                return "폴더가 비어있습니다."
+            result = []
+            for f in files:
+                is_folder = f.get("mimeType") == "application/vnd.google-apps.folder"
+                icon = "📁" if is_folder else "📄"
+                result.append(f"{icon} {f['name']} [ID: {f['id']}]")
+            return f"Drive 파일 목록 ({len(files)}개):\n" + "\n".join(result)
 
         elif tool_name == "web_search":
             from bot.services.gemini_service import search

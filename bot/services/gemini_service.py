@@ -1,9 +1,15 @@
-"""Gemini AI 실시간 웹 검색 서비스 - REST API 직접 호출"""
+"""Gemini AI 실시간 웹 검색 서비스 - google-genai SDK + Google Search grounding"""
 
-import httpx
+from google import genai
+from google.genai import types
 from bot.config import GEMINI_API_KEY, GEMINI_MODEL
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+def _get_client() -> genai.Client:
+    """Gemini 클라이언트 생성"""
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+    return genai.Client(api_key=GEMINI_API_KEY)
 
 
 async def search(query: str) -> dict:
@@ -12,57 +18,50 @@ async def search(query: str) -> dict:
     Returns:
         dict: {"answer": str, "sources": list[str]}
     """
-    if not GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+    client = _get_client()
 
-    url = API_URL.format(model=GEMINI_MODEL)
-
-    payload = {
-        "system_instruction": {
-            "parts": [{"text": (
-                "당신은 실시간 웹 검색 리서치 어시스턴트입니다. "
-                "한국어로 답변하세요. "
-                "검색 결과를 바탕으로 정확하고 최신 정보를 정리해서 제공하세요. "
-                "출처가 있으면 반드시 포함하세요."
-            )}]
-        },
-        "contents": [{"parts": [{"text": query}]}],
-        "tools": [{"google_search": {}}],
-    }
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            url,
-            params={"key": GEMINI_API_KEY},
-            json=payload,
+    try:
+        # Google Search grounding 시도
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=query,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+                system_instruction=(
+                    "당신은 실시간 웹 검색 리서치 어시스턴트입니다. "
+                    "한국어로 답변하세요. "
+                    "검색 결과를 바탕으로 정확하고 최신 정보를 정리해서 제공하세요. "
+                    "출처가 있으면 반드시 포함하세요."
+                ),
+            ),
+        )
+    except Exception:
+        # grounding 실패 시 일반 모드로 폴백
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=query,
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    "당신은 리서치 어시스턴트입니다. "
+                    "한국어로 답변하세요. "
+                    "정확하고 최신 정보를 정리해서 제공하세요."
+                ),
+            ),
         )
 
-        if resp.status_code != 200:
-            error_msg = resp.json().get("error", {}).get("message", resp.text)
-            raise RuntimeError(f"Gemini API 오류 ({resp.status_code}): {error_msg}")
+    answer = response.text or "검색 결과를 가져올 수 없습니다."
 
-        data = resp.json()
-
-    # 응답 텍스트 추출
-    answer = ""
-    try:
-        parts = data["candidates"][0]["content"]["parts"]
-        answer = "".join(p.get("text", "") for p in parts)
-    except (KeyError, IndexError):
-        answer = "검색 결과를 가져올 수 없습니다."
-
-    # 출처 추출
+    # 검색 출처(grounding metadata) 추출
     sources = []
     try:
-        metadata = data["candidates"][0].get("groundingMetadata", {})
-        chunks = metadata.get("groundingChunks", [])
-        for chunk in chunks:
-            web = chunk.get("web", {})
-            uri = web.get("uri", "")
-            title = web.get("title", "")
-            if uri:
-                sources.append(f"[{title}]({uri})" if title else uri)
-    except (KeyError, IndexError):
+        if response.candidates and response.candidates[0].grounding_metadata:
+            metadata = response.candidates[0].grounding_metadata
+            if metadata.grounding_chunks:
+                for chunk in metadata.grounding_chunks:
+                    if chunk.web and chunk.web.uri:
+                        title = chunk.web.title or ""
+                        sources.append(f"[{title}]({chunk.web.uri})" if title else chunk.web.uri)
+    except Exception:
         pass
 
     return {"answer": answer, "sources": sources}

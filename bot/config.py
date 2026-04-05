@@ -32,6 +32,9 @@ ALLOWED_PATHS = [
 # 데이터베이스
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "data" / "gs_secretary.db"))
 
+# 실행 모드: cloud (Drive+메모+리마인더), local (PC파일만), all (전부)
+RUN_MODE = os.getenv("RUN_MODE", "all").lower()
+
 # 로깅
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 

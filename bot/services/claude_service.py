@@ -101,7 +101,7 @@ MEMO_TOOLS = [
 SEARCH_TOOLS = [
     {
         "name": "web_search",
-        "description": "실시간 웹 검색을 수행합니다. 최신 뉴스, 날씨, 주가, 실시간 정보 등을 검색할 때 사용합니다.",
+        "description": "실시간 웹 검색을 수행합니다. 최신 뉴스, 날씨, 주가, 실시간 정보, 최근 이벤트 등 실시간 데이터가 필요할 때만 사용하세요. 일반 지식 질문에는 사용하지 마세요.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -201,8 +201,9 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 if search_result["sources"]:
                     text += "\n\n출처:\n" + "\n".join(search_result["sources"][:5])
                 return text
-            except Exception:
-                return "웹 검색을 수행할 수 없습니다. 검색 없이 알고 있는 정보로 답변해주세요."
+            except Exception as e:
+                # DuckDuckGo까지 모두 실패한 경우
+                return f"웹 검색을 수행할 수 없습니다 ({e}). 검색 없이 알고 있는 정보로 답변해주세요."
 
         else:
             return f"알 수 없는 도구: {tool_name}"

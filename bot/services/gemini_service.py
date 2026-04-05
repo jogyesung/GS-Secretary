@@ -19,6 +19,10 @@ async def search(query: str) -> dict:
     """
     _configure()
 
+    google_search_tool = genai.protos.Tool(
+        google_search=genai.protos.GoogleSearch()
+    )
+
     model = genai.GenerativeModel(
         model_name=GEMINI_MODEL,
         system_instruction=(
@@ -27,7 +31,7 @@ async def search(query: str) -> dict:
             "검색 결과를 바탕으로 정확하고 최신 정보를 정리해서 제공하세요. "
             "출처가 있으면 반드시 포함하세요."
         ),
-        tools="google_search",
+        tools=[google_search_tool],
     )
 
     response = await model.generate_content_async(query)
@@ -47,6 +51,6 @@ async def search(query: str) -> dict:
                         if uri:
                             sources.append(f"[{title}]({uri})" if title else uri)
     except Exception:
-        pass  # grounding metadata가 없을 수 있음
+        pass
 
     return {"answer": answer, "sources": sources}

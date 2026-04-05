@@ -2,7 +2,7 @@
 
 from telegram import Update
 from telegram.ext import ContextTypes
-from bot.config import RUN_MODE
+from bot.config import RUN_MODE, ANTHROPIC_API_KEY
 from bot.middleware.auth_middleware import authorized_only
 
 
@@ -52,6 +52,13 @@ def _build_help_text() -> str:
             "/pc\\_delete <경로> - 파일 삭제\n"
         )
 
+    if ANTHROPIC_API_KEY:
+        sections.append(
+            "*Claude AI 대화*\n"
+            "그냥 메시지를 보내면 Claude가 답변합니다.\n"
+            "/clear - 대화 히스토리 초기화\n"
+        )
+
     return "\n".join(sections)
 
 
@@ -62,6 +69,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mode_label = {"cloud": "☁️ 클라우드", "local": "💻 로컬", "all": "☁️+💻 전체"}.get(RUN_MODE, RUN_MODE)
 
     features = []
+    if ANTHROPIC_API_KEY:
+        features.append("Claude AI 대화")
     if RUN_MODE in ("cloud", "all"):
         features.extend(["Google Drive 연동", "메모", "리마인더"])
     if RUN_MODE in ("local", "all"):
@@ -100,6 +109,14 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         watches = get_active_watches()
         watch_status = f"✅ {len(watches)}개 감시 중" if watches else "없음"
         lines.append(f"파일 감시: {watch_status}")
+
+    if ANTHROPIC_API_KEY:
+        from bot.services.claude_service import get_history_length
+        user_id = update.effective_user.id
+        history_len = get_history_length(user_id)
+        lines.append(f"Claude AI: ✅ 활성 (대화 {history_len // 2}턴)")
+    else:
+        lines.append("Claude AI: ❌ 비활성")
 
     lines.append("봇 상태: ✅ 정상 동작 중")
 

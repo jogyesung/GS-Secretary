@@ -32,6 +32,17 @@ ALLOWED_PATHS = [
 # 데이터베이스
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "data" / "gs_secretary.db"))
 
+# Claude API
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+CLAUDE_SYSTEM_PROMPT = os.getenv(
+    "CLAUDE_SYSTEM_PROMPT",
+    "당신은 GS Secretary라는 텔레그램 업무 비서입니다. "
+    "한국어로 친절하고 간결하게 답변하세요. "
+    "업무 관련 질문, 문서 작성, 요약, 번역, 아이디어 정리 등을 도와줍니다."
+)
+CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "4096"))
+
 # 실행 모드: cloud (Drive+메모+리마인더), local (PC파일만), all (전부)
 RUN_MODE = os.getenv("RUN_MODE", "all").lower()
 

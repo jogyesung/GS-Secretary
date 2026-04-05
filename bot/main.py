@@ -9,9 +9,10 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from bot.config import TELEGRAM_BOT_TOKEN, LOG_LEVEL, TEMP_DOWNLOAD_PATH, RUN_MODE
+from bot.config import TELEGRAM_BOT_TOKEN, LOG_LEVEL, TEMP_DOWNLOAD_PATH, RUN_MODE, ANTHROPIC_API_KEY
 from bot.database import init_db
 from bot.handlers.start import start_command, help_command, status_command
+from bot.handlers.chat import handle_chat_message, clear_command
 
 # 로깅 설정
 logging.basicConfig(
@@ -148,6 +149,15 @@ def main():
         _register_local_handlers(app)
 
     _register_file_handler(app)
+
+    # === Claude AI 대화 ===
+    if ANTHROPIC_API_KEY:
+        app.add_handler(CommandHandler("clear", clear_command))
+        # 일반 텍스트 메시지 → Claude 대화 (가장 낮은 우선순위)
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_chat_message))
+        logger.info("Claude AI 대화 핸들러 등록")
+    else:
+        logger.warning("ANTHROPIC_API_KEY 미설정 - Claude 대화 기능 비활성화")
 
     mode_label = {"cloud": "☁️ 클라우드", "local": "💻 로컬", "all": "☁️+💻 전체"}
     logger.info(f"GS-Secretary 봇 시작! [{mode_label.get(RUN_MODE, RUN_MODE)}]")

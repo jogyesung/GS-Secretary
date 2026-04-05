@@ -171,10 +171,65 @@ async def get_file_info(file_id: str) -> dict:
     return await loop.run_in_executor(None, _info)
 
 
+def _download_to_buffer(service, file_id: str) -> bytes:
+    """파일을 메모리로 다운로드"""
+    request = service.files().get_media(fileId=file_id)
+    buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    return buffer.getvalue()
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    """PDF에서 텍스트 추출"""
+    from PyPDF2 import PdfReader
+    reader = PdfReader(io.BytesIO(data))
+    pages = []
+    for i, page in enumerate(reader.pages):
+        text = page.extract_text() or ""
+        if text.strip():
+            pages.append(f"[페이지 {i+1}]\n{text}")
+    return "\n\n".join(pages) if pages else "PDF에서 텍스트를 추출할 수 없습니다 (이미지 기반 PDF일 수 있음)."
+
+
+def _extract_docx_text(data: bytes) -> str:
+    """Word 문서에서 텍스트 추출"""
+    from docx import Document
+    doc = Document(io.BytesIO(data))
+    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+    # 테이블 내용도 추출
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                paragraphs.append(" | ".join(cells))
+    return "\n".join(paragraphs) if paragraphs else "문서가 비어있습니다."
+
+
+def _extract_xlsx_text(data: bytes) -> str:
+    """Excel 파일에서 텍스트 추출"""
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    sheets = []
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        rows = []
+        for row in ws.iter_rows(values_only=True):
+            cells = [str(c) if c is not None else "" for c in row]
+            if any(c for c in cells):
+                rows.append(" | ".join(cells))
+        if rows:
+            sheets.append(f"[시트: {sheet_name}]\n" + "\n".join(rows))
+    wb.close()
+    return "\n\n".join(sheets) if sheets else "스프레드시트가 비어있습니다."
+
+
 async def read_file_content(file_id: str, max_chars: int = 15000) -> dict:
     """Drive 파일의 텍스트 내용을 읽습니다.
 
-    Google Docs/Sheets/Slides는 export하고, 일반 텍스트 파일은 다운로드합니다.
+    Google Docs/Sheets/Slides는 export, PDF/Word/Excel은 텍스트 추출합니다.
 
     Returns:
         dict: {"name": str, "mime_type": str, "content": str}
@@ -183,7 +238,6 @@ async def read_file_content(file_id: str, max_chars: int = 15000) -> dict:
 
     def _read():
         service = _get_service()
-        # 파일 정보 가져오기
         file_info = service.files().get(
             fileId=file_id,
             fields="id, name, mimeType, size"
@@ -204,26 +258,47 @@ async def read_file_content(file_id: str, max_chars: int = 15000) -> dict:
                 _, done = downloader.next_chunk()
             content = buffer.getvalue().decode("utf-8", errors="replace")
 
+        # PDF
+        elif mime_type == "application/pdf" or name.endswith(".pdf"):
+            if size > 20_000_000:
+                return {"name": name, "mime_type": mime_type, "content": f"PDF가 너무 큽니다 ({size} bytes). 20MB 이하만 읽을 수 있습니다."}
+            data = _download_to_buffer(service, file_id)
+            content = _extract_pdf_text(data)
+
+        # Word (.docx)
+        elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or name.endswith(".docx"):
+            data = _download_to_buffer(service, file_id)
+            content = _extract_docx_text(data)
+
+        # Excel (.xlsx)
+        elif mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" or name.endswith(".xlsx"):
+            data = _download_to_buffer(service, file_id)
+            content = _extract_xlsx_text(data)
+
+        # 구형 Word (.doc) / Excel (.xls) → Google Docs export로 시도
+        elif name.endswith(".doc") or name.endswith(".xls") or name.endswith(".ppt"):
+            try:
+                request = service.files().export_media(fileId=file_id, mimeType="text/plain")
+                buffer = io.BytesIO()
+                downloader = MediaIoBaseDownload(buffer, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                content = buffer.getvalue().decode("utf-8", errors="replace")
+            except Exception:
+                return {"name": name, "mime_type": mime_type, "content": f"구형 Office 파일({name})은 읽을 수 없습니다. .docx/.xlsx로 변환해주세요."}
+
         # 일반 텍스트 파일
         elif mime_type in _TEXT_MIME_TYPES or name.endswith(
             (".txt", ".csv", ".json", ".md", ".py", ".js", ".html", ".xml", ".log", ".yaml", ".yml", ".ini", ".cfg", ".toml")
         ):
-            if size > 5_000_000:  # 5MB 제한
+            if size > 5_000_000:
                 return {"name": name, "mime_type": mime_type, "content": f"파일이 너무 큽니다 ({size} bytes). 5MB 이하만 읽을 수 있습니다."}
-            request = service.files().get_media(fileId=file_id)
-            buffer = io.BytesIO()
-            downloader = MediaIoBaseDownload(buffer, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            content = buffer.getvalue().decode("utf-8", errors="replace")
-
-        # PDF → 텍스트 추출 불가 안내
-        elif mime_type == "application/pdf" or name.endswith(".pdf"):
-            return {"name": name, "mime_type": mime_type, "content": f"[PDF 파일] {name} - PDF 내용은 직접 읽을 수 없습니다. Google Docs로 변환하면 읽을 수 있습니다."}
+            data = _download_to_buffer(service, file_id)
+            content = data.decode("utf-8", errors="replace")
 
         else:
-            return {"name": name, "mime_type": mime_type, "content": f"[바이너리 파일] {name} ({mime_type}) - 텍스트로 읽을 수 없는 파일입니다."}
+            return {"name": name, "mime_type": mime_type, "content": f"[지원하지 않는 형식] {name} ({mime_type})"}
 
         # 길이 제한
         if len(content) > max_chars:

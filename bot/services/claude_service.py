@@ -1,11 +1,14 @@
 """Claude AI 대화 서비스 - Anthropic API 연동 + Tool Use"""
 
 import json
+import logging
 import anthropic
 from bot.config import (
     ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_SYSTEM_PROMPT,
     CLAUDE_MAX_TOKENS, ALLOWED_PATHS, RUN_MODE, GEMINI_API_KEY,
 )
+
+logger = logging.getLogger(__name__)
 
 # 사용자별 대화 히스토리 (메모리 내 관리)
 _conversations: dict[int, list[dict]] = {}
@@ -291,9 +294,10 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 text = search_result["answer"]
                 if search_result["sources"]:
                     text += "\n\n출처:\n" + "\n".join(search_result["sources"][:5])
+                logger.info(f"웹 검색 결과 (앞 200자): {text[:200]}")
                 return text
-            except Exception:
-                # DuckDuckGo까지 모두 실패한 경우 → Claude가 자체 지식으로 답변하도록
+            except Exception as e:
+                logger.error(f"웹 검색 전체 실패: {e}")
                 return "검색 엔진에 일시적 문제가 있습니다. 반드시 당신이 알고 있는 지식으로 직접 답변하세요. 절대 '검색할 수 없다'거나 '다른 곳에서 확인하라'고 하지 마세요."
 
         else:
@@ -344,7 +348,9 @@ async def chat(user_id: int, message: str) -> str:
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
+                    logger.info(f"Claude 도구 호출: {block.name}({json.dumps(block.input, ensure_ascii=False)})")
                     result = await _execute_tool(block.name, block.input, user_id)
+                    logger.info(f"도구 결과 길이: {len(result)}자")
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,

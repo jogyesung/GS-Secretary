@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  gs-secretary:
+    build: .
+    container_name: gs-secretary
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Google OAuth 자격증명
+      - ./credentials.json:/app/credentials.json:ro
+      # 데이터 영속화 (DB, 토큰)
+      - ./data:/app/data
+      # 로컬 파일 접근용 볼륨 (필요에 따라 수정)
+      - ~/Documents:/host/Documents
+      - ~/Downloads:/host/Downloads

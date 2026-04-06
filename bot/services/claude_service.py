@@ -176,7 +176,7 @@ CALENDAR_TOOLS = [
                 "end_time": {"type": "string", "description": "종료 시간 (예: 2026-04-07T15:00:00)"},
                 "description": {"type": "string", "description": "일정 설명 (선택)", "default": ""},
                 "location": {"type": "string", "description": "장소 (선택)", "default": ""},
-                "all_day": {"type": "boolean", "description": "종일 일정 여부 (선택)", "default": false}
+                "all_day": {"type": "boolean", "description": "종일 일정 여부 (선택)", "default": False}
             },
             "required": ["summary", "start_time", "end_time"]
         }

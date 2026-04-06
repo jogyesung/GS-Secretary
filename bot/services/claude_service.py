@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 # 사용자별 대화 히스토리 (메모리 내 관리)
 _conversations: dict[int, list[dict]] = {}
 
+# 파일 전송 대기열 (user_id → list of file paths)
+_pending_files: dict[int, list[str]] = {}
+
 MAX_HISTORY = 20
 
 
@@ -121,6 +124,17 @@ DRIVE_TOOLS = [
             "properties": {
                 "file_id": {"type": "string", "description": "읽을 파일의 Google Drive ID"},
                 "max_chars": {"type": "integer", "description": "최대 읽을 글자 수 (기본 15000)", "default": 15000}
+            },
+            "required": ["file_id"]
+        }
+    },
+    {
+        "name": "drive_send",
+        "description": "Google Drive 파일을 텔레그램으로 전송합니다. 사용자가 파일을 보내달라고 하면 이 도구를 사용하세요.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "file_id": {"type": "string", "description": "전송할 파일의 Google Drive ID"}
             },
             "required": ["file_id"]
         }
@@ -267,6 +281,19 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 result.append(f"• {f['name']} [ID: {f['id']}] ({mime}){size_str} 수정: {modified}")
             return f"Drive 검색 결과 ({len(files)}개):\n" + "\n".join(result)
 
+        elif tool_name == "drive_send":
+            from bot.services.drive_service import download_file, get_file_info
+            from bot.config import TEMP_DOWNLOAD_PATH
+            file_info = await get_file_info(tool_input["file_id"])
+            file_name = file_info["name"]
+            dest = str(TEMP_DOWNLOAD_PATH / file_name)
+            await download_file(tool_input["file_id"], dest)
+            # 전송 대기열에 추가
+            if user_id not in _pending_files:
+                _pending_files[user_id] = []
+            _pending_files[user_id].append(dest)
+            return f"파일 '{file_name}' 전송 준비 완료. 텔레그램으로 보내드리겠습니다."
+
         elif tool_name == "drive_read":
             from bot.services.drive_service import read_file_content
             max_chars = tool_input.get("max_chars", 15000)
@@ -368,6 +395,11 @@ async def chat(user_id: int, message: str) -> str:
             return assistant_message
 
     return "도구 호출이 너무 많습니다. 다시 시도해주세요."
+
+
+def get_pending_files(user_id: int) -> list[str]:
+    """전송 대기 중인 파일 경로 목록 반환 후 대기열 비우기"""
+    return _pending_files.pop(user_id, [])
 
 
 def clear_history(user_id: int):

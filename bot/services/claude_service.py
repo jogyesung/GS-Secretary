@@ -155,8 +155,16 @@ DRIVE_TOOLS = [
 # Google Calendar 도구 (cloud/all 모드)
 CALENDAR_TOOLS = [
     {
+        "name": "calendar_list_calendars",
+        "description": "등록된 캘린더 목록을 조회합니다. Google Calendar, Outlook 연동 캘린더 등 모든 캘린더를 보여줍니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
         "name": "calendar_list",
-        "description": "Google Calendar 일정을 조회합니다. 오늘, 이번 주, 특정 기간의 일정을 확인할 때 사용합니다.",
+        "description": "모든 캘린더에서 일정을 통합 조회합니다. Google Calendar, Outlook 등 연동된 모든 캘린더의 일정을 보여줍니다.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -402,6 +410,17 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 icon = "📁" if is_folder else "📄"
                 result.append(f"{icon} {f['name']} [ID: {f['id']}]")
             return f"Drive 파일 목록 ({len(files)}개):\n" + "\n".join(result)
+
+        elif tool_name == "calendar_list_calendars":
+            from bot.services.calendar_service import list_calendars
+            calendars = await list_calendars()
+            if not calendars:
+                return "등록된 캘린더가 없습니다."
+            result = []
+            for c in calendars:
+                primary = " (기본)" if c["primary"] else ""
+                result.append(f"• {c['summary']}{primary} [ID: {c['id']}]")
+            return f"캘린더 목록 ({len(calendars)}개):\n" + "\n".join(result)
 
         elif tool_name == "calendar_list":
             from bot.services.calendar_service import list_events

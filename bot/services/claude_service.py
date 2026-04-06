@@ -247,7 +247,20 @@ def _build_system_prompt() -> str:
     now = datetime.now(kst)
     weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
     today = f"{now.strftime('%Y년 %m월 %d일')} {weekdays[now.weekday()]}"
-    extra = f"\n\n오늘 날짜: {today} (현재 시각: {now.strftime('%H:%M')} KST)"
+
+    # 이번 주 날짜 목록 생성 (날짜 계산 오류 방지)
+    week_info = []
+    monday = now - timedelta(days=now.weekday())
+    for i in range(7):
+        d = monday + timedelta(days=i)
+        marker = " ← 오늘" if d.date() == now.date() else ""
+        week_info.append(f"  {weekdays[i]}: {d.strftime('%Y-%m-%d')}{marker}")
+
+    extra = (
+        f"\n\n오늘: {today} (현재 시각: {now.strftime('%H:%M')} KST)"
+        f"\n이번 주:\n" + "\n".join(week_info)
+        + "\n\n[중요] 사용자가 '이번주 수요일'이라고 하면 위 표에서 수요일 날짜를 정확히 사용하세요. 절대 날짜를 추측하지 마세요."
+    )
     if ALLOWED_PATHS:
         paths_list = ", ".join(str(p) for p in ALLOWED_PATHS)
         extra += f"\n\n접근 가능한 PC 경로: {paths_list}"

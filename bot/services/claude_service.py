@@ -242,7 +242,9 @@ def _build_tools() -> list[dict]:
 
 def _build_system_prompt() -> str:
     """허용 경로 정보를 포함한 시스템 프롬프트 생성"""
-    extra = ""
+    from datetime import datetime
+    today = datetime.now().strftime("%Y년 %m월 %d일 %A")
+    extra = f"\n\n오늘 날짜: {today}"
     if ALLOWED_PATHS:
         paths_list = ", ".join(str(p) for p in ALLOWED_PATHS)
         extra += f"\n\n접근 가능한 PC 경로: {paths_list}"

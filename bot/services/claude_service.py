@@ -488,7 +488,7 @@ async def chat(user_id: int, message: str) -> str:
         _conversations[user_id] = history
 
     # Claude API 호출 (tool use 루프)
-    max_tool_rounds = 5
+    max_tool_rounds = 10
     for _ in range(max_tool_rounds):
         kwargs = {
             "model": CLAUDE_MODEL,

@@ -218,6 +218,57 @@ CALENDAR_TOOLS = [
     },
 ]
 
+# Gmail 도구 (cloud/all 모드)
+GMAIL_TOOLS = [
+    {
+        "name": "gmail_list",
+        "description": "Gmail 받은편지함의 이메일 목록을 조회합니다. 기본적으로 읽지 않은 메일을 보여줍니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "max_results": {"type": "integer", "description": "최대 조회 수 (기본 10)", "default": 10},
+                "query": {"type": "string", "description": "Gmail 검색 쿼리 (기본 'is:unread'). 예: 'is:unread', 'from:example@gmail.com', 'subject:회의'", "default": "is:unread"}
+            }
+        }
+    },
+    {
+        "name": "gmail_read",
+        "description": "특정 이메일의 전체 내용을 읽습니다. gmail_list나 gmail_search로 찾은 이메일의 ID를 사용합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message_id": {"type": "string", "description": "읽을 이메일의 ID"}
+            },
+            "required": ["message_id"]
+        }
+    },
+    {
+        "name": "gmail_send",
+        "description": "이메일을 전송합니다. 받는 사람, 제목, 본문을 입력합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string", "description": "받는 사람 이메일 주소"},
+                "subject": {"type": "string", "description": "이메일 제목"},
+                "body": {"type": "string", "description": "이메일 본문 내용"}
+            },
+            "required": ["to", "subject", "body"]
+        }
+    },
+    {
+        "name": "gmail_search",
+        "description": "Gmail에서 이메일을 검색합니다. Gmail 검색 쿼리 문법을 사용합니다. 예: 'from:user@example.com', 'subject:보고서 after:2026/01/01', 'has:attachment'",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Gmail 검색 쿼리"},
+                "max_results": {"type": "integer", "description": "최대 조회 수 (기본 10)", "default": 10}
+            },
+            "required": ["query"]
+        }
+    },
+]
+
 # 웹 검색 도구 (Gemini API 키가 있을 때만)
 SEARCH_TOOLS = [
     {
@@ -243,6 +294,7 @@ def _build_tools() -> list[dict]:
         tools.extend(MEMO_TOOLS)
         tools.extend(DRIVE_TOOLS)
         tools.extend(CALENDAR_TOOLS)
+        tools.extend(GMAIL_TOOLS)
     if GEMINI_API_KEY:
         tools.extend(SEARCH_TOOLS)
     return tools
@@ -293,6 +345,11 @@ def _build_system_prompt() -> str:
         "\n사용자가 일정, 스케줄, 회의, 약속 등을 언급하면 Calendar 도구를 사용하세요."
         "\n오늘 날짜를 기준으로 시간을 계산하세요."
         "\n일정 생성 시 종료 시간이 없으면 시작 시간 + 1시간으로 설정하세요."
+        "\n\n[Gmail 활용 지침]"
+        "\n사용자가 이메일, 메일, 받은편지함 등을 언급하면 Gmail 도구를 사용하세요."
+        "\ngmail_list로 메일 목록을 먼저 조회하고, gmail_read로 상세 내용을 읽으세요."
+        "\n이메일 전송 시 받는 사람 주소를 반드시 확인하세요."
+        "\nGmail 검색 쿼리 문법: from:, to:, subject:, has:attachment, after:, before:, is:unread 등을 사용할 수 있습니다."
         )
 
     extra += (
@@ -467,6 +524,55 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
             from bot.services.calendar_service import delete_event
             await delete_event(tool_input["event_id"])
             return "일정이 삭제되었습니다."
+
+        elif tool_name == "gmail_list":
+            from bot.services.gmail_service import list_emails
+            max_results = tool_input.get("max_results", 10)
+            query = tool_input.get("query", "is:unread")
+            emails = await list_emails(max_results=max_results, query=query)
+            if not emails:
+                return f"'{query}' 조건에 맞는 이메일이 없습니다."
+            result = []
+            for e in emails:
+                unread = "🔵" if "UNREAD" in e.get("label_ids", []) else "⚪"
+                result.append(f"{unread} {e['date']} | {e['from']}\n  제목: {e['subject']}\n  미리보기: {e['snippet'][:80]}...\n  [ID: {e['id']}]")
+            return f"이메일 목록 ({len(emails)}개):\n\n" + "\n\n".join(result)
+
+        elif tool_name == "gmail_read":
+            from bot.services.gmail_service import read_email
+            email = await read_email(tool_input["message_id"])
+            body = email["body"]
+            if len(body) > 10000:
+                body = body[:10000] + "\n\n...(본문이 잘렸습니다)"
+            return (
+                f"제목: {email['subject']}\n"
+                f"보낸 사람: {email['from']}\n"
+                f"받는 사람: {email['to']}\n"
+                f"날짜: {email['date']}\n\n"
+                f"본문:\n{body}"
+            )
+
+        elif tool_name == "gmail_send":
+            from bot.services.gmail_service import send_email
+            sent = await send_email(
+                to=tool_input["to"],
+                subject=tool_input["subject"],
+                body=tool_input["body"],
+            )
+            return f"이메일 전송 완료 (ID: {sent['id']})\n받는 사람: {tool_input['to']}\n제목: {tool_input['subject']}"
+
+        elif tool_name == "gmail_search":
+            from bot.services.gmail_service import search_emails
+            query = tool_input["query"]
+            max_results = tool_input.get("max_results", 10)
+            emails = await search_emails(query=query, max_results=max_results)
+            if not emails:
+                return f"'{query}' 검색 결과가 없습니다."
+            result = []
+            for e in emails:
+                unread = "🔵" if "UNREAD" in e.get("label_ids", []) else "⚪"
+                result.append(f"{unread} {e['date']} | {e['from']}\n  제목: {e['subject']}\n  미리보기: {e['snippet'][:80]}...\n  [ID: {e['id']}]")
+            return f"검색 결과 ({len(emails)}개, 쿼리: {query}):\n\n" + "\n\n".join(result)
 
         elif tool_name == "web_search":
             from bot.services.gemini_service import search

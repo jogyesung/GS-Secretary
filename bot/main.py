@@ -29,9 +29,16 @@ async def post_init(application: Application):
     logger.info("데이터베이스 초기화 완료")
 
     if RUN_MODE in ("cloud", "all"):
-        from bot.handlers.schedule import check_reminders
+        from bot.handlers.schedule import check_reminders, daily_briefing
+        from datetime import time as dt_time, timezone, timedelta
         application.job_queue.run_repeating(check_reminders, interval=30, first=5)
         logger.info("리마인더 스케줄러 시작됨")
+
+        # 매일 아침 7시(KST) 브리핑 = UTC 22:00 (전날)
+        kst = timezone(timedelta(hours=9))
+        briefing_time = dt_time(hour=7, minute=0, tzinfo=kst)
+        application.job_queue.run_daily(daily_briefing, time=briefing_time)
+        logger.info("아침 브리핑 스케줄러 시작됨 (매일 07:00 KST)")
 
 
 def _register_cloud_handlers(app: Application):

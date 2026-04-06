@@ -191,7 +191,34 @@ def _extract_pdf_text(data: bytes) -> str:
         text = page.extract_text() or ""
         if text.strip():
             pages.append(f"[페이지 {i+1}]\n{text}")
-    return "\n\n".join(pages) if pages else "PDF에서 텍스트를 추출할 수 없습니다 (이미지 기반 PDF일 수 있음)."
+    return "\n\n".join(pages) if pages else ""
+
+
+def _ocr_pdf_via_drive(service, file_id: str) -> str:
+    """Google Drive OCR로 이미지 PDF 텍스트 추출 (PDF → Google Docs 변환)"""
+    try:
+        # PDF를 Google Docs로 복사 (OCR 자동 적용)
+        copied = service.files().copy(
+            fileId=file_id,
+            body={"mimeType": "application/vnd.google-apps.document", "name": "temp_ocr"},
+        ).execute()
+        doc_id = copied["id"]
+
+        # Google Docs에서 텍스트 export
+        request = service.files().export_media(fileId=doc_id, mimeType="text/plain")
+        buffer = io.BytesIO()
+        downloader = MediaIoBaseDownload(buffer, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        text = buffer.getvalue().decode("utf-8", errors="replace")
+
+        # 임시 Google Docs 삭제
+        service.files().delete(fileId=doc_id).execute()
+
+        return text.strip() if text.strip() else "OCR로도 텍스트를 추출할 수 없습니다."
+    except Exception as e:
+        return f"OCR 변환 실패: {e}"
 
 
 def _extract_docx_text(data: bytes) -> str:
@@ -264,6 +291,9 @@ async def read_file_content(file_id: str, max_chars: int = 15000) -> dict:
                 return {"name": name, "mime_type": mime_type, "content": f"PDF가 너무 큽니다 ({size} bytes). 20MB 이하만 읽을 수 있습니다."}
             data = _download_to_buffer(service, file_id)
             content = _extract_pdf_text(data)
+            # 텍스트 추출 실패 시 Google Drive OCR로 재시도
+            if not content:
+                content = _ocr_pdf_via_drive(service, file_id)
 
         # Word (.docx)
         elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or name.endswith(".docx"):

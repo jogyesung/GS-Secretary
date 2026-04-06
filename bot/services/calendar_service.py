@@ -14,8 +14,27 @@ def _get_service():
     return build("calendar", "v3", credentials=creds)
 
 
-async def list_events(days: int = 1, max_results: int = 10) -> list[dict]:
-    """오늘부터 N일간의 일정 조회"""
+async def list_calendars() -> list[dict]:
+    """사용 가능한 캘린더 목록 조회"""
+    loop = asyncio.get_event_loop()
+
+    def _list():
+        service = _get_service()
+        result = service.calendarList().list().execute()
+        calendars = []
+        for cal in result.get("items", []):
+            calendars.append({
+                "id": cal["id"],
+                "summary": cal.get("summary", ""),
+                "primary": cal.get("primary", False),
+            })
+        return calendars
+
+    return await loop.run_in_executor(None, _list)
+
+
+async def list_events(days: int = 1, max_results: int = 20) -> list[dict]:
+    """오늘부터 N일간의 일정 조회 (모든 캘린더 통합)"""
     loop = asyncio.get_event_loop()
 
     def _list():
@@ -24,34 +43,46 @@ async def list_events(days: int = 1, max_results: int = 10) -> list[dict]:
         time_min = now.isoformat() + "Z"
         time_max = (now + timedelta(days=days)).isoformat() + "Z"
 
-        events_result = (
-            service.events()
-            .list(
-                calendarId="primary",
-                timeMin=time_min,
-                timeMax=time_max,
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy="startTime",
-            )
-            .execute()
-        )
-        events = events_result.get("items", [])
+        # 모든 캘린더 가져오기
+        cal_list = service.calendarList().list().execute()
+        all_events = []
 
-        result = []
-        for event in events:
-            start = event["start"].get("dateTime", event["start"].get("date", ""))
-            end = event["end"].get("dateTime", event["end"].get("date", ""))
-            result.append({
-                "id": event["id"],
-                "summary": event.get("summary", "(제목 없음)"),
-                "start": start,
-                "end": end,
-                "location": event.get("location", ""),
-                "description": event.get("description", ""),
-                "status": event.get("status", ""),
-            })
-        return result
+        for cal in cal_list.get("items", []):
+            cal_id = cal["id"]
+            cal_name = cal.get("summary", "")
+            try:
+                events_result = (
+                    service.events()
+                    .list(
+                        calendarId=cal_id,
+                        timeMin=time_min,
+                        timeMax=time_max,
+                        maxResults=max_results,
+                        singleEvents=True,
+                        orderBy="startTime",
+                    )
+                    .execute()
+                )
+                for event in events_result.get("items", []):
+                    start = event["start"].get("dateTime", event["start"].get("date", ""))
+                    end = event["end"].get("dateTime", event["end"].get("date", ""))
+                    all_events.append({
+                        "id": event["id"],
+                        "calendar": cal_name,
+                        "calendar_id": cal_id,
+                        "summary": event.get("summary", "(제목 없음)"),
+                        "start": start,
+                        "end": end,
+                        "location": event.get("location", ""),
+                        "description": event.get("description", ""),
+                        "status": event.get("status", ""),
+                    })
+            except Exception:
+                continue
+
+        # 시작 시간순 정렬
+        all_events.sort(key=lambda e: e["start"])
+        return all_events
 
     return await loop.run_in_executor(None, _list)
 

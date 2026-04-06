@@ -416,7 +416,8 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 if "T" in time_str:
                     time_str = time_str[:16].replace("T", " ")
                 loc = f" 📍{e['location']}" if e["location"] else ""
-                result.append(f"• {time_str} | {e['summary']}{loc} [ID: {e['id']}]")
+                cal = f" [{e.get('calendar', '')}]" if e.get("calendar") else ""
+                result.append(f"• {time_str} | {e['summary']}{loc}{cal} [ID: {e['id']}]")
             return f"일정 ({len(events)}개):\n" + "\n".join(result)
 
         elif tool_name == "calendar_create":

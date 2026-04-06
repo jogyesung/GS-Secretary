@@ -350,7 +350,7 @@ async def chat(user_id: int, message: str) -> str:
                 if block.type == "tool_use":
                     logger.info(f"Claude 도구 호출: {block.name}({json.dumps(block.input, ensure_ascii=False)})")
                     result = await _execute_tool(block.name, block.input, user_id)
-                    logger.info(f"도구 결과 길이: {len(result)}자")
+                    logger.info(f"도구 결과 ({len(result)}자): {result[:300]}")
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,

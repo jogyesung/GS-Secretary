@@ -165,6 +165,12 @@ def main():
     else:
         logger.warning("GEMINI_API_KEY 미설정 - 실시간 검색 기능 비활성화")
 
+    # === API 사용량 조회 ===
+    if ANTHROPIC_API_KEY:
+        from bot.handlers.usage import usage_command
+        app.add_handler(CommandHandler("usage", usage_command))
+        logger.info("API 사용량 핸들러 등록")
+
     # === Claude AI 대화 ===
     if ANTHROPIC_API_KEY:
         app.add_handler(CommandHandler("clear", clear_command))

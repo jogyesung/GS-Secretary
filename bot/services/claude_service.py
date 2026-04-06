@@ -596,6 +596,18 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
         return f"도구 실행 오류: {e}"
 
 
+async def _log_api_usage(user_id: int, input_tokens: int, output_tokens: int, tool_calls: int):
+    """API 사용량을 DB에 기록"""
+    try:
+        from bot.services.usage_service import log_usage
+        await log_usage(user_id, CLAUDE_MODEL, input_tokens, output_tokens, tool_calls)
+        from bot.services.usage_service import estimate_cost
+        cost = estimate_cost(input_tokens, output_tokens, CLAUDE_MODEL)
+        logger.info(f"API 사용량 기록: input={input_tokens}, output={output_tokens}, tools={tool_calls}, cost=${cost:.4f}")
+    except Exception as e:
+        logger.error(f"사용량 기록 실패: {e}")
+
+
 async def chat(user_id: int, message: str) -> str:
     """Claude와 대화. Tool use를 지원하며 사용자별 히스토리를 유지합니다."""
     client = _get_client()
@@ -614,6 +626,10 @@ async def chat(user_id: int, message: str) -> str:
 
     # Claude API 호출 (tool use 루프)
     max_tool_rounds = 10
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_tool_calls = 0
+
     for _ in range(max_tool_rounds):
         kwargs = {
             "model": CLAUDE_MODEL,
@@ -626,6 +642,11 @@ async def chat(user_id: int, message: str) -> str:
 
         response = await client.messages.create(**kwargs)
 
+        # 토큰 사용량 누적
+        if hasattr(response, "usage"):
+            total_input_tokens += response.usage.input_tokens
+            total_output_tokens += response.usage.output_tokens
+
         # 응답에서 텍스트와 tool_use 분리
         if response.stop_reason == "tool_use":
             # 전체 content를 히스토리에 추가
@@ -635,6 +656,7 @@ async def chat(user_id: int, message: str) -> str:
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
+                    total_tool_calls += 1
                     logger.info(f"Claude 도구 호출: {block.name}({json.dumps(block.input, ensure_ascii=False)})")
                     result = await _execute_tool(block.name, block.input, user_id)
                     logger.info(f"도구 결과 ({len(result)}자): {result[:300]}")
@@ -648,12 +670,17 @@ async def chat(user_id: int, message: str) -> str:
             continue  # Claude가 도구 결과를 보고 다시 응답하도록
 
         else:
+            # 사용량 기록
+            await _log_api_usage(user_id, total_input_tokens, total_output_tokens, total_tool_calls)
+
             # 최종 텍스트 응답
             text_parts = [block.text for block in response.content if hasattr(block, "text")]
             assistant_message = "\n".join(text_parts)
             history.append({"role": "assistant", "content": assistant_message})
             return assistant_message
 
+    # 도구 호출 초과 시에도 사용량 기록
+    await _log_api_usage(user_id, total_input_tokens, total_output_tokens, total_tool_calls)
     return "도구 호출이 너무 많습니다. 다시 시도해주세요."
 
 

@@ -1,9 +1,25 @@
 """Google Calendar API 서비스 - 일정 조회, 생성, 수정, 삭제"""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from bot.utils.drive_auth import get_drive_credentials
+
+KST = timezone(timedelta(hours=9))
+
+
+def _to_kst(dt_str: str) -> str:
+    """ISO 8601 시간 문자열을 KST로 변환"""
+    if not dt_str or "T" not in dt_str:
+        return dt_str  # 종일 일정은 그대로
+    try:
+        # +09:00, Z 등 다양한 형식 처리
+        dt_str_clean = dt_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(dt_str_clean)
+        dt_kst = dt.astimezone(KST)
+        return dt_kst.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+    except Exception:
+        return dt_str
 
 
 def _get_service():
@@ -71,8 +87,8 @@ async def list_events(days: int = 1, max_results: int = 20) -> list[dict]:
                         "calendar": cal_name,
                         "calendar_id": cal_id,
                         "summary": event.get("summary", "(제목 없음)"),
-                        "start": start,
-                        "end": end,
+                        "start": _to_kst(start),
+                        "end": _to_kst(end),
                         "location": event.get("location", ""),
                         "description": event.get("description", ""),
                         "status": event.get("status", ""),

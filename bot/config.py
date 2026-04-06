@@ -21,7 +21,10 @@ ALLOWED_USER_IDS = [
 # Google Drive OAuth 2.0
 GOOGLE_CREDENTIALS_FILE = os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
 GOOGLE_TOKEN_FILE = os.getenv("GOOGLE_TOKEN_FILE", str(BASE_DIR / "data" / "token.json"))
-GOOGLE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+GOOGLE_SCOPES = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/calendar",
+]
 
 
 def _restore_google_files():

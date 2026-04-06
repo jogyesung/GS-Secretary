@@ -152,6 +152,64 @@ DRIVE_TOOLS = [
     },
 ]
 
+# Google Calendar 도구 (cloud/all 모드)
+CALENDAR_TOOLS = [
+    {
+        "name": "calendar_list",
+        "description": "Google Calendar 일정을 조회합니다. 오늘, 이번 주, 특정 기간의 일정을 확인할 때 사용합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer", "description": "오늘부터 몇 일간 조회할지 (기본 1, 이번 주는 7)", "default": 1},
+                "max_results": {"type": "integer", "description": "최대 조회 수 (기본 10)", "default": 10}
+            }
+        }
+    },
+    {
+        "name": "calendar_create",
+        "description": "Google Calendar에 새 일정을 만듭니다. 시간은 반드시 ISO 8601 형식으로 입력하세요 (예: 2026-04-07T14:00:00).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string", "description": "일정 제목"},
+                "start_time": {"type": "string", "description": "시작 시간 (예: 2026-04-07T14:00:00)"},
+                "end_time": {"type": "string", "description": "종료 시간 (예: 2026-04-07T15:00:00)"},
+                "description": {"type": "string", "description": "일정 설명 (선택)", "default": ""},
+                "location": {"type": "string", "description": "장소 (선택)", "default": ""},
+                "all_day": {"type": "boolean", "description": "종일 일정 여부 (선택)", "default": false}
+            },
+            "required": ["summary", "start_time", "end_time"]
+        }
+    },
+    {
+        "name": "calendar_update",
+        "description": "기존 Google Calendar 일정을 수정합니다. calendar_list로 조회한 일정의 ID를 사용합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_id": {"type": "string", "description": "수정할 일정의 ID"},
+                "summary": {"type": "string", "description": "새 제목 (변경 시)"},
+                "start_time": {"type": "string", "description": "새 시작 시간 (변경 시)"},
+                "end_time": {"type": "string", "description": "새 종료 시간 (변경 시)"},
+                "description": {"type": "string", "description": "새 설명 (변경 시)"},
+                "location": {"type": "string", "description": "새 장소 (변경 시)"}
+            },
+            "required": ["event_id"]
+        }
+    },
+    {
+        "name": "calendar_delete",
+        "description": "Google Calendar 일정을 삭제합니다. calendar_list로 조회한 일정의 ID를 사용합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_id": {"type": "string", "description": "삭제할 일정의 ID"}
+            },
+            "required": ["event_id"]
+        }
+    },
+]
+
 # 웹 검색 도구 (Gemini API 키가 있을 때만)
 SEARCH_TOOLS = [
     {
@@ -176,6 +234,7 @@ def _build_tools() -> list[dict]:
     if RUN_MODE in ("cloud", "all"):
         tools.extend(MEMO_TOOLS)
         tools.extend(DRIVE_TOOLS)
+        tools.extend(CALENDAR_TOOLS)
     if GEMINI_API_KEY:
         tools.extend(SEARCH_TOOLS)
     return tools
@@ -196,6 +255,10 @@ def _build_system_prompt() -> str:
             "\n2. 찾은 파일의 ID로 drive_read를 사용해 내용을 읽으세요."
             "\n3. 파일 내용을 바탕으로 정확하게 답변하세요."
             "\n사용자가 '내 자료', '내 문서', '보고서', '파일' 등을 언급하면 Drive를 먼저 검색하세요."
+        "\n\n[Google Calendar 활용 지침]"
+        "\n사용자가 일정, 스케줄, 회의, 약속 등을 언급하면 Calendar 도구를 사용하세요."
+        "\n오늘 날짜를 기준으로 시간을 계산하세요."
+        "\n일정 생성 시 종료 시간이 없으면 시작 시간 + 1시간으로 설정하세요."
         )
 
     extra += (
@@ -313,6 +376,51 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 icon = "📁" if is_folder else "📄"
                 result.append(f"{icon} {f['name']} [ID: {f['id']}]")
             return f"Drive 파일 목록 ({len(files)}개):\n" + "\n".join(result)
+
+        elif tool_name == "calendar_list":
+            from bot.services.calendar_service import list_events
+            days = tool_input.get("days", 1)
+            max_results = tool_input.get("max_results", 10)
+            events = await list_events(days=days, max_results=max_results)
+            if not events:
+                return f"향후 {days}일 내 일정이 없습니다."
+            result = []
+            for e in events:
+                time_str = e["start"]
+                if "T" in time_str:
+                    time_str = time_str[:16].replace("T", " ")
+                loc = f" 📍{e['location']}" if e["location"] else ""
+                result.append(f"• {time_str} | {e['summary']}{loc} [ID: {e['id']}]")
+            return f"일정 ({len(events)}개):\n" + "\n".join(result)
+
+        elif tool_name == "calendar_create":
+            from bot.services.calendar_service import create_event
+            event = await create_event(
+                summary=tool_input["summary"],
+                start_time=tool_input["start_time"],
+                end_time=tool_input["end_time"],
+                description=tool_input.get("description", ""),
+                location=tool_input.get("location", ""),
+                all_day=tool_input.get("all_day", False),
+            )
+            return f"일정 생성 완료: {event['summary']} ({event['start']})"
+
+        elif tool_name == "calendar_update":
+            from bot.services.calendar_service import update_event
+            event = await update_event(
+                event_id=tool_input["event_id"],
+                summary=tool_input.get("summary"),
+                start_time=tool_input.get("start_time"),
+                end_time=tool_input.get("end_time"),
+                description=tool_input.get("description"),
+                location=tool_input.get("location"),
+            )
+            return f"일정 수정 완료: {event['summary']} ({event['start']})"
+
+        elif tool_name == "calendar_delete":
+            from bot.services.calendar_service import delete_event
+            await delete_event(tool_input["event_id"])
+            return "일정이 삭제되었습니다."
 
         elif tool_name == "web_search":
             from bot.services.gemini_service import search

@@ -55,9 +55,11 @@ async def list_events(days: int = 1, max_results: int = 20) -> list[dict]:
 
     def _list():
         service = _get_service()
-        now = datetime.utcnow()
-        time_min = now.isoformat() + "Z"
-        time_max = (now + timedelta(days=days)).isoformat() + "Z"
+        # KST 기준 오늘 00:00부터 days일 후 00:00까지 조회
+        now_kst = datetime.now(KST)
+        today_start_kst = now_kst.replace(hour=0, minute=0, second=0, microsecond=0)
+        time_min = today_start_kst.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        time_max = (today_start_kst + timedelta(days=days)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # 모든 캘린더 가져오기
         cal_list = service.calendarList().list().execute()

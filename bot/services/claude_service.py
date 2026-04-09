@@ -486,14 +486,40 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
             events = await list_events(days=days, max_results=max_results)
             if not events:
                 return f"향후 {days}일 내 일정이 없습니다."
+
+            # 날짜별로 그룹화하여 명확히 구분
+            from datetime import datetime as dt, timezone as tz, timedelta as td
+            kst = tz(td(hours=9))
+            today_str = dt.now(kst).strftime("%Y-%m-%d")
+            tomorrow_str = (dt.now(kst) + td(days=1)).strftime("%Y-%m-%d")
+
             result = []
+            current_date_label = ""
             for e in events:
-                time_str = e["start"]
-                if "T" in time_str:
-                    time_str = time_str[:16].replace("T", " ")
+                # 이벤트 날짜 추출
+                start_str = e["start"]
+                if "T" in start_str:
+                    event_date = start_str[:10]
+                    time_str = start_str[11:16]  # HH:MM
+                else:
+                    event_date = start_str[:10]
+                    time_str = "종일"
+
+                # 날짜 라벨 추가
+                if event_date == today_str:
+                    date_label = f"📅 [{event_date} 오늘]"
+                elif event_date == tomorrow_str:
+                    date_label = f"📅 [{event_date} 내일]"
+                else:
+                    date_label = f"📅 [{event_date}]"
+
+                if date_label != current_date_label:
+                    result.append(f"\n{date_label}")
+                    current_date_label = date_label
+
                 loc = f" 📍{e['location']}" if e["location"] else ""
                 cal = f" [{e.get('calendar', '')}]" if e.get("calendar") else ""
-                result.append(f"• {time_str} | {e['summary']}{loc}{cal} [ID: {e['id']}]")
+                result.append(f"  • {time_str} | {e['summary']}{loc}{cal} [ID: {e['id']}]")
             return f"일정 ({len(events)}개):\n" + "\n".join(result)
 
         elif tool_name == "calendar_create":

@@ -652,6 +652,10 @@ async def chat(user_id: int, message: str) -> str:
         _conversations[user_id] = []
 
     history = _conversations[user_id]
+
+    if not message or not message.strip():
+        return "메시지를 입력해주세요."
+
     history.append({"role": "user", "content": message})
 
     if len(history) > MAX_HISTORY:
@@ -663,6 +667,12 @@ async def chat(user_id: int, message: str) -> str:
     total_input_tokens = 0
     total_output_tokens = 0
     total_tool_calls = 0
+
+    # 히스토리에서 빈 content 제거 (이전 버그로 인한 잔여 데이터 방어)
+    history[:] = [
+        msg for msg in history
+        if not (isinstance(msg.get("content"), str) and not msg["content"].strip())
+    ]
 
     for _ in range(max_tool_rounds):
         kwargs = {
@@ -708,8 +718,8 @@ async def chat(user_id: int, message: str) -> str:
             await _log_api_usage(user_id, total_input_tokens, total_output_tokens, total_tool_calls)
 
             # 최종 텍스트 응답
-            text_parts = [block.text for block in response.content if hasattr(block, "text")]
-            assistant_message = "\n".join(text_parts)
+            text_parts = [block.text for block in response.content if hasattr(block, "text") and block.text]
+            assistant_message = "\n".join(text_parts) if text_parts else "처리가 완료되었습니다."
             history.append({"role": "assistant", "content": assistant_message})
             return assistant_message
 

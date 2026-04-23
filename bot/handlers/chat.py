@@ -91,8 +91,11 @@ async def _gemini_chat(query: str) -> str:
 @authorized_only
 async def handle_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """스마트 라우팅: 간단한 질문은 Gemini, 복잡한 업무는 Claude"""
-    message = update.message.text
+    message = update.message.text or ""
     user_id = update.effective_user.id
+
+    if not message.strip():
+        return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 

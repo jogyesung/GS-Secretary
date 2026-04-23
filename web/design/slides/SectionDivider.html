@@ -1,0 +1,28 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;width:1280px;height:720px;overflow:hidden;font-family:var(--font-sans);}
+.slide{position:relative;width:1280px;height:720px;background:url(../assets/hero_ifc_seoul.jpeg) center/cover;}
+.slide::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(28,54,100,.05) 0%, rgba(28,54,100,.6) 100%);}
+.content{position:absolute;inset:0;z-index:2;padding:70px;display:flex;align-items:center;gap:30px;}
+.num{font-size:220px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.02em;text-shadow:0 2px 8px rgba(0,0,0,.2);}
+.block{border-left:3px solid #fff;padding-left:22px;color:#fff;}
+.eyebrow{font-size:12px;letter-spacing:.2em;text-transform:uppercase;opacity:.85;font-weight:700;margin-bottom:14px;}
+.title{font-size:60px;font-weight:700;line-height:1.05;}
+.footer{position:absolute;left:70px;right:70px;bottom:26px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#fff;font-weight:700;z-index:3;}
+.pg{width:22px;height:22px;border-radius:999px;background:rgba(255,255,255,.25);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;letter-spacing:0;}
+.logo{position:absolute;top:54px;left:70px;z-index:3;height:28px;filter:brightness(0) invert(1);}
+</style></head>
+<body>
+<div class="slide" data-screen-label="03 Section divider">
+  <img src="../assets/centroid_logo_horizontal.png" class="logo" alt="">
+  <div class="content">
+    <div class="num">2.</div>
+    <div class="block">
+      <div class="eyebrow">Section</div>
+      <div class="title">Investment<br>Highlight</div>
+    </div>
+  </div>
+  <div class="footer"><span>Strictly Confidential</span><span class="pg">7</span></div>
+</div>
+</body></html>

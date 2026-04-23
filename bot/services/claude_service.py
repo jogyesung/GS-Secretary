@@ -269,6 +269,70 @@ GMAIL_TOOLS = [
     },
 ]
 
+# CIP 슬라이드 생성 도구
+SLIDE_TOOLS = [
+    {
+        "name": "slide_list_types",
+        "description": "사용 가능한 CIP 브랜드 슬라이드 템플릿 종류를 조회합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
+        "name": "slide_generate_cover",
+        "description": "CIP 브랜드 표지(Cover) 슬라이드를 생성합니다. 프로젝트명, 부제목, 날짜를 입력받아 HTML 파일을 생성합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "프로젝트/문서 제목 (예: 'Project Albatross')"},
+                "subtitle": {"type": "string", "description": "부제목 (예: 'Investment Memorandum')", "default": "Investment Memorandum"},
+                "date": {"type": "string", "description": "날짜 (예: 'July 2025'). 비우면 현재 날짜", "default": ""}
+            },
+            "required": ["title"]
+        }
+    },
+    {
+        "name": "slide_generate_twocol",
+        "description": "CIP 브랜드 2단 레이아웃 슬라이드를 생성합니다. 좌우 컬럼에 각각 제목과 본문을 입력합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "section_label": {"type": "string", "description": "섹션 라벨 (예: '2-1. Market Position')"},
+                "title": {"type": "string", "description": "슬라이드 제목"},
+                "tagline": {"type": "string", "description": "부제/태그라인"},
+                "left_title": {"type": "string", "description": "왼쪽 컬럼 제목"},
+                "left_body": {"type": "string", "description": "왼쪽 컬럼 본문"},
+                "right_title": {"type": "string", "description": "오른쪽 컬럼 제목"},
+                "right_body": {"type": "string", "description": "오른쪽 컬럼 본문"},
+                "page_num": {"type": "integer", "description": "페이지 번호", "default": 1}
+            },
+            "required": ["section_label", "title", "tagline", "left_title", "left_body", "right_title", "right_body"]
+        }
+    },
+    {
+        "name": "slide_generate_divider",
+        "description": "CIP 브랜드 섹션 구분 슬라이드를 생성합니다. IFC 서울 배경 + 큰 번호 + 섹션 제목.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "number": {"type": "string", "description": "섹션 번호 (예: '1.', '2.')"},
+                "title": {"type": "string", "description": "섹션 제목 (예: 'Executive Summary')"},
+                "page_num": {"type": "integer", "description": "페이지 번호", "default": 1}
+            },
+            "required": ["number", "title"]
+        }
+    },
+    {
+        "name": "slide_generate_closing",
+        "description": "CIP 브랜드 종료(Thank you) 슬라이드를 생성합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+]
+
 # 웹 검색 도구 (Gemini API 키가 있을 때만)
 SEARCH_TOOLS = [
     {
@@ -295,6 +359,7 @@ def _build_tools() -> list[dict]:
         tools.extend(DRIVE_TOOLS)
         tools.extend(CALENDAR_TOOLS)
         tools.extend(GMAIL_TOOLS)
+    tools.extend(SLIDE_TOOLS)
     if GEMINI_API_KEY:
         tools.extend(SEARCH_TOOLS)
     return tools
@@ -351,6 +416,14 @@ def _build_system_prompt() -> str:
         "\n이메일 전송 시 받는 사람 주소를 반드시 확인하세요."
         "\nGmail 검색 쿼리 문법: from:, to:, subject:, has:attachment, after:, before:, is:unread 등을 사용할 수 있습니다."
         )
+
+    extra += (
+        "\n\n[CIP 슬라이드 생성 지침]"
+        "\n사용자가 슬라이드, PPT, 프레젠테이션, 표지, 덱 등을 언급하면 슬라이드 도구를 사용하세요."
+        "\n사용 가능한 슬라이드: cover(표지), twocol(2단 레이아웃), divider(섹션 구분), closing(종료)."
+        "\nCentroid Investment Partners 브랜드 가이드라인에 맞춘 HTML 슬라이드를 생성합니다."
+        "\n생성된 파일은 텔레그램으로 자동 전송됩니다."
+    )
 
     extra += (
         "\n\n[중요 규칙]"
@@ -599,6 +672,70 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 unread = "🔵" if "UNREAD" in e.get("label_ids", []) else "⚪"
                 result.append(f"{unread} {e['date']} | {e['from']}\n  제목: {e['subject']}\n  미리보기: {e['snippet'][:80]}...\n  [ID: {e['id']}]")
             return f"검색 결과 ({len(emails)}개, 쿼리: {query}):\n\n" + "\n\n".join(result)
+
+        elif tool_name == "slide_list_types":
+            from bot.services.slide_service import list_slide_types
+            types = list_slide_types()
+            result = []
+            for t in types:
+                status = "✅" if t["exists"] else "❌"
+                result.append(f"{status} {t['type']}: {t['label']}")
+            return "CIP 슬라이드 템플릿:\n" + "\n".join(result)
+
+        elif tool_name == "slide_generate_cover":
+            from bot.services.slide_service import generate_cover_slide, save_generated_slide
+            html = generate_cover_slide(
+                title=tool_input["title"],
+                subtitle=tool_input.get("subtitle", "Investment Memorandum"),
+                date=tool_input.get("date", ""),
+            )
+            path = save_generated_slide(html, "cover.html")
+            if user_id not in _pending_files:
+                _pending_files[user_id] = []
+            _pending_files[user_id].append(str(path))
+            return f"표지 슬라이드 생성 완료: {tool_input['title']}. 파일을 텔레그램으로 전송합니다."
+
+        elif tool_name == "slide_generate_twocol":
+            from bot.services.slide_service import generate_twocol_slide, save_generated_slide
+            html = generate_twocol_slide(
+                section_label=tool_input["section_label"],
+                title=tool_input["title"],
+                tagline=tool_input["tagline"],
+                left_title=tool_input["left_title"],
+                left_body=tool_input["left_body"],
+                right_title=tool_input["right_title"],
+                right_body=tool_input["right_body"],
+                page_num=tool_input.get("page_num", 1),
+            )
+            filename = f"twocol_{tool_input['section_label'][:10].replace(' ', '_')}.html"
+            path = save_generated_slide(html, filename)
+            if user_id not in _pending_files:
+                _pending_files[user_id] = []
+            _pending_files[user_id].append(str(path))
+            return f"2단 레이아웃 슬라이드 생성 완료: {tool_input['title']}. 파일을 텔레그램으로 전송합니다."
+
+        elif tool_name == "slide_generate_divider":
+            from bot.services.slide_service import generate_section_divider, save_generated_slide
+            html = generate_section_divider(
+                number=tool_input["number"],
+                title=tool_input["title"],
+                page_num=tool_input.get("page_num", 1),
+            )
+            filename = f"divider_{tool_input['number'].replace('.', '')}.html"
+            path = save_generated_slide(html, filename)
+            if user_id not in _pending_files:
+                _pending_files[user_id] = []
+            _pending_files[user_id].append(str(path))
+            return f"섹션 구분 슬라이드 생성 완료: {tool_input['number']} {tool_input['title']}. 파일을 텔레그램으로 전송합니다."
+
+        elif tool_name == "slide_generate_closing":
+            from bot.services.slide_service import generate_closing_slide, save_generated_slide
+            html = generate_closing_slide()
+            path = save_generated_slide(html, "closing.html")
+            if user_id not in _pending_files:
+                _pending_files[user_id] = []
+            _pending_files[user_id].append(str(path))
+            return "종료 슬라이드 생성 완료. 파일을 텔레그램으로 전송합니다."
 
         elif tool_name == "web_search":
             from bot.services.gemini_service import search

@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:0;background:#fff;font-family:var(--font-sans);display:flex;}
+.pane{flex:1;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+.pane + .pane{border-left:1px solid #D2D2D2}
+.pane.dark{background:#1C3664;color:#fff}
+.lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--cip-gray-600);font-weight:700;}
+.pane.dark .lbl{color:rgba(255,255,255,0.7)}
+img{max-width:220px;max-height:70px;display:block;}
+.pane.dark img{filter:invert(100%) brightness(1.6)}
+</style></head>
+<body>
+<div class="pane">
+  <img src="../assets/centroid_logo_horizontal.png" alt="">
+  <div class="lbl">Horizontal — primary</div>
+</div>
+<div class="pane">
+  <img src="../assets/centroid_logo_stacked.png" alt="" style="max-height:100px">
+  <div class="lbl">Stacked — cover</div>
+</div>
+<div class="pane dark">
+  <img src="../assets/centroid_logo_horizontal.png" alt="">
+  <div class="lbl">On navy</div>
+</div>
+</body></html>

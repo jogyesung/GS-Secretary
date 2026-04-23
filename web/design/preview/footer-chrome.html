@@ -1,0 +1,235 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+/* Proportions taken directly from the production slide master
+   (slideMaster1.xml in 실제 적용.pptx). Slide canvas is 10.833" × 7.500".
+   Scale factor here is 72 px/in → frame is 780 × 540 px.
+*/
+:root { --scale: 72px; }
+body{margin:0;padding:28px;background:#F7F8FA;font-family:var(--font-sans);color:var(--fg-1);}
+.label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-2);font-weight:700;margin-bottom:4px;}
+.sub{font-size:12px;color:var(--fg-2);margin-bottom:16px;}
+
+/* Slide frame */
+.slide{
+  width:calc(10.833 * var(--scale));
+  height:calc(7.5 * var(--scale));
+  background:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(17,24,39,.08);
+  position:relative;
+  font-size:12px;
+}
+
+/* --- TOP CHROME --- */
+/* Strictly private confidential — 9pt, top margin */
+.sp-strictly{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(.112 * var(--scale));
+  width:calc(2.252 * var(--scale));
+  height:calc(.173 * var(--scale));
+  font-size:7.5px;
+  letter-spacing:.12em;
+  color:#FF0000;           /* master spec: red, 9pt bold */
+  font-weight:700;
+  text-transform:uppercase;
+  display:flex;align-items:center;
+}
+
+/* Source line (top, above title) */
+.sp-source{
+  position:absolute;
+  left:calc(.692 * var(--scale));
+  top:calc(.281 * var(--scale));
+  width:calc(4.567 * var(--scale));
+  height:calc(.276 * var(--scale));
+  font-size:8px;
+  color:var(--fg-2);
+  font-style:italic;
+  display:flex;align-items:center;
+}
+
+/* Master title — 16pt, page title */
+.sp-title{
+  position:absolute;
+  left:calc(.692 * var(--scale));
+  top:calc(.557 * var(--scale));
+  width:calc(9.449 * var(--scale));
+  height:calc(.394 * var(--scale));
+  font-size:14px;
+  color:var(--cip-navy-900);
+  font-weight:700;
+  letter-spacing:.005em;
+  line-height:1;
+  display:flex;align-items:center;
+}
+
+/* Tagline — 13pt, subline under title */
+.sp-tagline{
+  position:absolute;
+  left:calc(.692 * var(--scale));
+  top:calc(.950 * var(--scale));
+  width:calc(9.449 * var(--scale));
+  height:calc(.554 * var(--scale));
+  font-size:11px;
+  color:var(--fg-2);
+  line-height:1.35;
+  display:flex;align-items:flex-start;
+}
+
+/* Content heading rule — 12pt, navy, with a thin underline */
+.sp-pageheading{
+  position:absolute;
+  left:calc(.692 * var(--scale));
+  top:calc(1.622 * var(--scale));
+  width:calc(9.449 * var(--scale));
+  height:calc(.276 * var(--scale));
+  font-size:10.5px;
+  font-weight:700;
+  color:var(--cip-navy-900);
+  border-bottom:1.25px solid var(--cip-navy-900);
+  display:flex;align-items:center;
+  padding-bottom:3px;
+}
+
+/* --- CONTENT AREA (reference box) --- */
+.sp-body{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(1.782 * var(--scale));
+  width:calc(9.587 * var(--scale));
+  height:calc(5.118 * var(--scale));
+  outline:1px dashed #D2D2D2;
+  outline-offset:-1px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--cip-gray-400);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+/* --- FOOTER --- */
+/* Source footnote (bottom of content area) */
+.sp-sourcefoot{
+  position:absolute;
+  left:calc(.692 * var(--scale));
+  top:calc(6.899 * var(--scale));
+  width:calc(9.449 * var(--scale));
+  height:calc(.348 * var(--scale));
+  font-size:7.5px;
+  color:var(--fg-3);
+  border-top:.75px solid #E5E5E5;
+  padding-top:3px;
+  font-style:italic;
+}
+
+/* Footer — logo */
+.sp-logo{
+  position:absolute;
+  left:calc(.732 * var(--scale));
+  top:calc(7.218 * var(--scale));
+  width:calc(1.298 * var(--scale));
+  height:calc(.188 * var(--scale));
+  background:url('../assets/logos/centroid-footer-logo.png') no-repeat left center;
+  background-size:contain;
+}
+
+/* Footer — "STRICTLY CONFIDENTIAL" left-aligned (next to logo region) */
+.sp-confidential{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(7.215 * var(--scale));
+  width:calc(2.252 * var(--scale));
+  height:calc(.173 * var(--scale));
+  font-size:7.5px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--cip-gray-600);
+  font-weight:700;
+  display:none; /* shown on a variant below */
+  align-items:center;
+}
+
+/* Page number — right-aligned, plain "page N" */
+.sp-page{
+  position:absolute;
+  left:calc(8.047 * var(--scale));
+  top:calc(7.215 * var(--scale));
+  width:calc(2.252 * var(--scale));
+  height:calc(.173 * var(--scale));
+  font-size:7.5px;
+  letter-spacing:.08em;
+  color:var(--cip-gray-600);
+  text-align:right;
+  display:flex;align-items:center;justify-content:flex-end;
+  font-variant-numeric:tabular-nums;
+}
+
+/* annotation markers */
+.anno{
+  position:absolute;pointer-events:none;
+  font-family:var(--font-mono);font-size:9px;color:#C26A00;
+  background:#FFF6E5;padding:2px 6px;border:1px solid #F0D7A0;border-radius:2px;
+  white-space:nowrap;z-index:5;
+}
+.anno::before{
+  content:"";position:absolute;background:#C26A00;
+}
+.anno.bl::before{left:0;bottom:-8px;width:1px;height:8px}
+.anno.tl::before{left:0;top:-8px;width:1px;height:8px}
+.anno.tr::before{right:0;top:-8px;width:1px;height:8px}
+.anno.br::before{right:0;bottom:-8px;width:1px;height:8px}
+
+.showAnno .anno{display:block}
+.hideAnno .anno{display:none}
+
+.toggle{
+  position:absolute;right:-2px;top:-28px;font-size:10px;color:var(--fg-2);
+  display:flex;gap:8px;align-items:center;
+}
+.toggle button{font:inherit;padding:3px 8px;border:1px solid var(--border-1);background:#fff;border-radius:2px;cursor:pointer;}
+.toggle button.on{background:var(--cip-navy-900);color:#fff;border-color:var(--cip-navy-900);}
+</style></head>
+<body>
+
+<div class="label">Slide chrome — content page (from master spec)</div>
+<div class="sub">Canvas 10.833 × 7.5 in · widescreen 4:3 · positions sampled from slideMaster1.xml / slideLayout8.xml</div>
+
+<div style="position:relative;display:inline-block;">
+  <div class="toggle">
+    <span>Guides</span>
+    <button id="on"  class="on">On</button>
+    <button id="off">Off</button>
+  </div>
+
+  <div class="slide showAnno" id="slide">
+    <!-- TOP -->
+    <div class="sp-strictly">STRICTLY PRIVATE AND CONFIDENTIAL</div>
+    <div class="sp-source">Source: Company data, Centroid analysis</div>
+    <div class="sp-title">투자 구조 (안)</div>
+    <div class="sp-tagline">본건 제안펀드인 Centroid Project PEF는 휴비스 주주사(SK/삼양)가 보유한 경영권 지분을 인수하는 구조임</div>
+    <div class="sp-pageheading">투자 구조 (안)</div>
+
+    <!-- BODY -->
+    <div class="sp-body">CONTENT AREA · 9.59 × 5.12 in</div>
+
+    <!-- FOOTER -->
+    <div class="sp-sourcefoot">Note: 1) 2025-05-14 기준 1개월/1주일/기산일 가중평균 주가; 2) 휴비스 2공장에 대한 담보부사채 포함</div>
+    <div class="sp-logo"></div>
+    <div class="sp-page">page&nbsp;5</div>
+
+    <!-- ANNOTATIONS -->
+    <div class="anno tl" style="left:calc(.683 * var(--scale));top:-18px;">0.68" · strictly private (9pt)</div>
+    <div class="anno tl" style="left:calc(.692 * var(--scale));top:calc(.56*var(--scale) - 18px);">0.56" · master title (16pt navy)</div>
+    <div class="anno tl" style="left:calc(.692 * var(--scale));top:calc(1.62*var(--scale) - 18px);">1.62" · page heading + rule (12pt)</div>
+    <div class="anno bl" style="left:calc(.732 * var(--scale));top:calc(7.218*var(--scale) + 10px);">7.22" · logo 1.30 × 0.19 in</div>
+    <div class="anno br" style="right:calc(.534 * var(--scale));top:calc(7.215*var(--scale) + 10px);">page N · right-aligned (8pt)</div>
+  </div>
+</div>
+
+<script>
+const s = document.getElementById('slide');
+document.getElementById('on').onclick  = () => { s.className='slide showAnno'; document.getElementById('on').className='on'; document.getElementById('off').className=''; };
+document.getElementById('off').onclick = () => { s.className='slide hideAnno'; document.getElementById('off').className='on'; document.getElementById('on').className=''; };
+</script>
+</body></html>

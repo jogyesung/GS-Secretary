@@ -1,0 +1,214 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+/* Scale: 72px = 1 inch (same as footer-chrome preview) */
+:root{ --scale:72px; }
+body{margin:0;padding:28px;background:#F7F8FA;font-family:var(--font-sans);color:var(--fg-1);}
+.label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-2);font-weight:700;margin-bottom:4px;}
+.sub{font-size:12px;color:var(--fg-2);margin-bottom:20px;max-width:780px;line-height:1.5;}
+.stack{display:flex;flex-direction:column;gap:32px;}
+
+h5{margin:0 0 10px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-3);font-weight:700;}
+.note{font-family:var(--font-mono);font-size:10px;color:var(--fg-3);margin-top:10px;max-width:62ch;line-height:1.5;}
+
+/* ---------- SLIDE FRAME (10.833 × 7.5 in) ---------- */
+.slide{
+  width:calc(10.833 * var(--scale));
+  height:calc(7.5 * var(--scale));
+  background:#fff;
+  position:relative;
+  box-shadow:0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(17,24,39,.08);
+  font-size:12px;
+  overflow:hidden;
+}
+
+/* ---- Shared master chrome positions (layout-5 / Basic) ---- */
+/* Strictly Confidential — 9pt RED bold (master spec) */
+.ch-strictly{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(.112 * var(--scale));
+  width:calc(2.252 * var(--scale));
+  height:calc(.173 * var(--scale));
+  font-size:7.5px;letter-spacing:.12em;color:#FF0000;font-weight:700;
+  text-transform:uppercase;display:flex;align-items:center;
+}
+/* Source (top, layout-5 specific) — italic 10pt */
+.ch-source-top{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(.257 * var(--scale));
+  width:calc(4.176 * var(--scale));
+  height:calc(.252 * var(--scale));
+  font-size:8px;color:var(--fg-2);font-style:italic;
+  display:flex;align-items:center;
+}
+/* Master title — 16pt Arial */
+.ch-title{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(.509 * var(--scale));
+  width:calc(8.64 * var(--scale));
+  height:calc(.36 * var(--scale));
+  font-size:14px;color:var(--cip-navy-900);font-weight:700;
+  letter-spacing:.003em;line-height:1;display:flex;align-items:center;
+}
+/* Tagline — 13pt */
+.ch-tagline{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(.868 * var(--scale));
+  width:calc(8.64 * var(--scale));
+  height:calc(.507 * var(--scale));
+  font-size:11px;color:var(--fg-2);line-height:1.4;
+  display:flex;align-items:flex-start;
+}
+/* Header / Page heading — 12pt navy bold with underline */
+.ch-header{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(1.483 * var(--scale));
+  width:calc(8.64 * var(--scale));
+  height:calc(.252 * var(--scale));
+  font-size:10.5px;font-weight:700;color:var(--cip-navy-900);
+  border-bottom:1.25px solid var(--cip-navy-900);
+  display:flex;align-items:center;padding-bottom:3px;
+}
+/* Body zone reference */
+.ch-body{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(1.782 * var(--scale));
+  width:calc(9.587 * var(--scale));
+  height:calc(4.517 * var(--scale));
+  outline:1px dashed #E1E5EB;outline-offset:-1px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--cip-gray-400);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+}
+/* Source (bottom, layout-5 specific) — 8pt Arial */
+.ch-source-bottom{
+  position:absolute;
+  left:calc(.683 * var(--scale));
+  top:calc(6.309 * var(--scale));
+  width:calc(8.64 * var(--scale));
+  height:calc(.318 * var(--scale));
+  font-size:7.5px;color:var(--fg-3);font-style:italic;
+  border-top:.5px solid #EAECEF;padding-top:3px;
+}
+/* Logo — 1.30 × 0.19 in */
+.ch-logo{
+  position:absolute;
+  left:calc(.732 * var(--scale));
+  top:calc(7.218 * var(--scale));
+  width:calc(1.298 * var(--scale));
+  height:calc(.188 * var(--scale));
+  background:url('../assets/logos/centroid-footer-logo.png') no-repeat left center;
+  background-size:contain;
+}
+/* Page number — 8pt right */
+.ch-page{
+  position:absolute;
+  left:calc(8.047 * var(--scale));
+  top:calc(7.215 * var(--scale));
+  width:calc(2.252 * var(--scale));
+  height:calc(.173 * var(--scale));
+  font-size:7.5px;letter-spacing:.06em;color:var(--cip-gray-600);
+  text-align:right;display:flex;align-items:center;justify-content:flex-end;
+  font-variant-numeric:tabular-nums;
+}
+
+/* ---------- SECTION DIVIDER variant ---------- */
+.divider-slide{background:var(--cip-navy-900);color:#fff;}
+.divider-slide .ch-body,
+.divider-slide .ch-header,
+.divider-slide .ch-title,
+.divider-slide .ch-tagline,
+.divider-slide .ch-source-top,
+.divider-slide .ch-source-bottom{display:none;}
+.divider-slide .ch-strictly{color:#FF6060;}
+.divider-slide .ch-page{color:rgba(255,255,255,.65);}
+.divider-slide .ch-logo{filter:brightness(0) invert(1);opacity:.9;}
+
+.div-inner{
+  position:absolute;
+  left:calc(.683 * var(--scale));top:calc(2.2 * var(--scale));
+  width:calc(9.587 * var(--scale));
+  display:flex;align-items:center;gap:calc(.4 * var(--scale));
+}
+.div-inner .num{
+  font-family:var(--font-mono);font-size:calc(.9 * var(--scale));line-height:1;
+  color:var(--cip-gold-900);font-weight:300;letter-spacing:-.02em;
+}
+.div-inner .vr{
+  width:1px;background:rgba(255,255,255,.22);align-self:stretch;margin:calc(.08 * var(--scale)) 0;
+}
+.div-inner .kicker{
+  font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-bottom:12px;
+}
+.div-inner .head{
+  font-size:calc(.42 * var(--scale));font-weight:700;line-height:1.1;letter-spacing:-.003em;
+}
+.div-inner .tag{
+  font-size:13px;color:rgba(255,255,255,.78);margin-top:14px;line-height:1.45;max-width:72ch;
+}
+</style></head>
+<body>
+
+<div class="label">Title & heading — basic layout (slideLayout5)</div>
+<div class="sub">
+  Spec extracted from production master. All five placeholders plus persistent chrome are positioned at the exact inch coordinates from the PPT file. 이것이 가장 기본 슬라이드 스타일입니다 — 모든 본문 슬라이드는 이 레이아웃에서 출발합니다.
+</div>
+
+<div class="stack">
+
+  <!-- ---------- PRIMARY: Basic content slide ---------- -->
+  <div>
+    <h5>Primary — 기본 content slide (모든 본문 페이지 출발점)</h5>
+    <div class="slide">
+      <!-- master chrome -->
+      <div class="ch-strictly">STRICTLY CONFIDENTIAL</div>
+      <div class="ch-source-top">Source: Company data, Centroid analysis</div>
+
+      <!-- layout-5 placeholders -->
+      <div class="ch-title">투자 구조 (안)</div>
+      <div class="ch-tagline">본건 제안펀드인 Centroid Project PEF는 휴비스 주주사(SK/삼양)가 보유한 경영권 지분을 인수하고, 구주 및 담보부 사채에 투자하는 구조임</div>
+      <div class="ch-header">투자 구조 (안)</div>
+
+      <!-- body -->
+      <div class="ch-body">CONTENT AREA</div>
+
+      <!-- footer -->
+      <div class="ch-source-bottom">Note: 1) 2025-05-14 기준 1개월/1주일/기산일 가중평균 주가; 2) 휴비스 2공장에 대한 담보부사채 포함</div>
+      <div class="ch-logo"></div>
+      <div class="ch-page">page&nbsp;5</div>
+    </div>
+    <div class="note">
+      Placeholders (top → bottom): <b>Source</b> 0.26" · <b>Title</b> 0.51" (16pt Arial navy) · <b>Tagline</b> 0.87" (13pt) · <b>Header</b> 1.48" (12pt bold w/ underline) · <b>Body</b> 1.78"–6.31" · <b>Source</b> 6.31" (8pt italic).
+      Master chrome: <b>Strictly Confidential</b> 9pt <span style="color:#FF0000;font-weight:700">red</span> (top-left) · logo 1.30×0.19" (bottom-left) · "page N" 8pt (bottom-right).
+    </div>
+  </div>
+
+  <!-- ---------- VARIANT: Section divider ---------- -->
+  <div>
+    <h5>Variant — Section divider (부 구분용, 선택)</h5>
+    <div class="slide divider-slide">
+      <div class="ch-strictly">STRICTLY CONFIDENTIAL</div>
+      <div class="div-inner">
+        <div class="num">01</div>
+        <div class="vr"></div>
+        <div>
+          <div class="kicker">Executive Summary</div>
+          <div class="head">투자 개요 및 핵심 논리</div>
+          <div class="tag">본건 펀드의 투자 구조, 거래 조건, 기대 수익률을 종합적으로 검토</div>
+        </div>
+      </div>
+      <div class="ch-logo"></div>
+      <div class="ch-page">page&nbsp;2</div>
+    </div>
+    <div class="note">
+      Navy full-bleed, gold numbering — 기본 마스터 외 <b>선택적 variant</b>. 부(chapter) 구분이 필요할 때만 사용. 실제 PPT 템플릿에는 이 레이아웃이 없음 — 추가 제안 아이템.
+    </div>
+  </div>
+
+</div>
+</body></html>

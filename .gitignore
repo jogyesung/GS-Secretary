@@ -24,6 +24,9 @@ data/*.db
 # Temp files
 data/temp/
 
+# Generated slides
+data/slides/
+
 # IDE
 .vscode/
 .idea/

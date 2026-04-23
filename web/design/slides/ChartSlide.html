@@ -1,0 +1,66 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+html,body{margin:0;padding:0;width:1280px;height:720px;overflow:hidden;background:#fff;font-family:var(--font-sans);}
+.slide{position:relative;width:1280px;height:720px;padding:70px;box-sizing:border-box;display:flex;flex-direction:column;}
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#797979;font-weight:700}
+.title{font-size:32px;font-weight:700;color:#1C3664;margin-top:6px;border-left:3px solid #1C3664;padding-left:16px;line-height:1.1}
+.tagline{font-size:14px;color:#797979;margin-top:12px;max-width:780px}
+.wrap{display:grid;grid-template-columns:2fr 1fr;gap:40px;margin-top:32px;flex:1}
+.chart{position:relative;padding-top:30px}
+.bars{display:flex;align-items:flex-end;gap:24px;height:340px;border-bottom:1px solid #D2D2D2;padding-left:30px;}
+.bar{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;height:100%;justify-content:flex-end;position:relative}
+.b{width:100%;position:relative;display:flex;justify-content:center;align-items:flex-start;padding-top:6px;color:#fff;font-size:12px;font-weight:700;}
+.b.tint{color:#1C3664}
+.lab{font-size:12px;color:#4D4D4D;font-weight:700}
+.yaxis{position:absolute;left:0;top:30px;bottom:20px;display:flex;flex-direction:column-reverse;justify-content:space-between;font-size:10px;color:#A6A6A6;font-family:var(--font-mono)}
+.legend{display:flex;gap:18px;margin-top:14px;font-size:11px;color:#4D4D4D;}
+.dot{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:middle;border-radius:1px}
+.side h3{font-size:16px;color:#1C3664;margin:0 0 8px;font-weight:700}
+.side .sub{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#26ACF1;font-weight:700}
+.side p{font-size:13px;color:#4D4D4D;line-height:1.55;margin:10px 0 18px}
+.kpi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.kpi .c{background:#F2F2F2;padding:14px}
+.kpi .k{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#797979;font-weight:700}
+.kpi .v{font-size:22px;color:#1C3664;font-weight:700;line-height:1;margin-top:6px}
+.kpi .d{font-size:11px;color:#008C72;font-weight:700;margin-top:4px}
+.src{font-size:10px;color:#A6A6A6;font-style:italic;margin-top:12px;}
+.footer{position:absolute;left:70px;right:70px;bottom:26px;display:flex;justify-content:space-between;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#797979;font-weight:700;border-top:1px solid #D2D2D2;padding-top:12px;}
+.pg{width:22px;height:22px;border-radius:999px;background:#797979;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;letter-spacing:0;}
+</style></head>
+<body>
+<div class="slide" data-screen-label="05 Chart">
+  <div class="eyebrow">2-2. Financial Performance</div>
+  <div class="title">Revenue compounded at 45% CAGR (2023–2028F)</div>
+  <div class="tagline">Forecast reflects management plan, adjusted for Centroid base-case assumptions. Series 1 = core equipment; Series 2 = apparel &amp; accessories.</div>
+  <div class="wrap">
+    <div class="chart">
+      <div class="yaxis"><span>0</span><span>50</span><span>100</span><span>150</span><span>200</span></div>
+      <div class="bars">
+        <div class="bar"><div class="b" style="height:15%;background:#1C3664">31</div><div class="lab">2023</div></div>
+        <div class="bar"><div class="b" style="height:22%;background:#1C3664">44</div><div class="lab">2024</div></div>
+        <div class="bar"><div class="b" style="height:32%;background:#1664AA">64</div><div class="lab">2025</div></div>
+        <div class="bar"><div class="b" style="height:45%;background:#26ACF1">90</div><div class="lab">2026F</div></div>
+        <div class="bar"><div class="b tint" style="height:63%;background:#7FCDF5">126</div><div class="lab">2027F</div></div>
+        <div class="bar"><div class="b tint" style="height:100%;background:#BEE7FB">200</div><div class="lab">2028F</div></div>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:#1C3664"></span>Actual</span>
+        <span><span class="dot" style="background:#26ACF1"></span>Management plan</span>
+        <span><span class="dot" style="background:#BEE7FB"></span>Centroid forecast</span>
+      </div>
+      <div class="src">Source: Company filings, Centroid analysis. $USD millions.</div>
+    </div>
+    <div class="side">
+      <div class="sub">Key takeaway</div>
+      <h3>Apparel crosses equipment by FY27</h3>
+      <p>Equipment remains the category anchor, but the non-equipment attach rate has climbed from 8% to 31% of revenue in four years.</p>
+      <div class="kpi">
+        <div class="c"><div class="k">2028F Rev.</div><div class="v">$200M</div><div class="d">+59%</div></div>
+        <div class="c"><div class="k">Gross margin</div><div class="v">48%</div><div class="d">+2.3pp</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>Strictly Confidential</span><span class="pg">11</span></div>
+</div>
+</body></html>

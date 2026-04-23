@@ -59,6 +59,13 @@ def _build_help_text() -> str:
             "  예: /search 오늘 코스피 지수\n"
         )
 
+    sections.append(
+        "*CIP 슬라이드*\n"
+        "카리나에게 슬라이드/PPT 생성을 요청하세요.\n"
+        "  예: '프로젝트 알바트로스 표지 만들어줘'\n"
+        "  예: '섹션 구분 슬라이드 만들어줘'\n"
+    )
+
     if ANTHROPIC_API_KEY:
         sections.append(
             "*AI 대화*\n"

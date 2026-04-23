@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:24px;background:#fff;font-family:var(--font-sans);color:var(--fg-1);}
+.label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-2);font-weight:700;margin-bottom:4px;}
+.sub{font-size:12px;color:var(--fg-2);margin-bottom:16px;}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+.head{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-2);font-weight:700;text-align:center;padding:4px 0;}
+.sw{aspect-ratio:1/.82;border-radius:2px;position:relative;padding:10px;display:flex;flex-direction:column;justify-content:space-between;}
+.sw .n{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.92;}
+.sw .h{font-family:var(--font-mono);font-size:10.5px;opacity:.85;}
+.sw .r{font-family:var(--font-mono);font-size:9.5px;opacity:.75;line-height:1.3;}
+.dark{color:#fff;} .light{color:var(--cip-navy-900);}
+</style></head>
+<body>
+<div class="label">Main — Brand palette</div>
+<div class="sub">6 hues × 4 tints. Row 1 = base (signature); 700 / 300 / 100 = approved tints for charts, fills &amp; callouts.</div>
+
+<div class="grid">
+  <div class="head">Navy</div><div class="head">Blue</div><div class="head">Cyan</div><div class="head">Gold</div><div class="head">Red</div><div class="head">Gray</div>
+
+  <!-- Row 1 — base -->
+  <div class="sw dark" style="background:#1C3664"><div class="n">Navy 900</div><div class="h">#1C3664<br><span class="r">40·80·120</span></div></div>
+  <div class="sw dark" style="background:#1664AA"><div class="n">Blue 900</div><div class="h">#1664AA<br><span class="r">22·100·170</span></div></div>
+  <div class="sw dark" style="background:#26ACF1"><div class="n">Cyan 900</div><div class="h">#26ACF1<br><span class="r">38·172·241</span></div></div>
+  <div class="sw dark" style="background:#FBB403"><div class="n">Gold 900</div><div class="h">#FBB403<br><span class="r">251·180·3</span></div></div>
+  <div class="sw dark" style="background:#C00000"><div class="n">Red 900</div><div class="h">#C00000<br><span class="r">192·0·0</span></div></div>
+  <div class="sw light" style="background:#B8B8B8"><div class="n">Gray 900</div><div class="h">#B8B8B8<br><span class="r">184·184·184</span></div></div>
+
+  <!-- Row 2 — 700 -->
+  <div class="sw dark" style="background:#4C7ACD"><div class="n">Navy 700</div><div class="h">#4C7ACD<br><span class="r">76·122·205</span></div></div>
+  <div class="sw dark" style="background:#56A4E9"><div class="n">Blue 700</div><div class="h">#56A4E9<br><span class="r">86·164·233</span></div></div>
+  <div class="sw light" style="background:#7DCDF7"><div class="n">Cyan 700</div><div class="h">#7DCDF7<br><span class="r">125·205·247</span></div></div>
+  <div class="sw light" style="background:#FDD267"><div class="n">Gold 700</div><div class="h">#FDD267<br><span class="r">253·210·103</span></div></div>
+  <div class="sw dark" style="background:#FF4040"><div class="n">Red 700</div><div class="h">#FF4040<br><span class="r">255·64·64</span></div></div>
+  <div class="sw light" style="background:#D4D4D4"><div class="n">Gray 700</div><div class="h">#D4D4D4<br><span class="r">212·212·212</span></div></div>
+
+  <!-- Row 3 — 300 -->
+  <div class="sw light" style="background:#88A7DE"><div class="n">Navy 300</div><div class="h">#88A7DE<br><span class="r">136·167·222</span></div></div>
+  <div class="sw light" style="background:#8EC2F0"><div class="n">Blue 300</div><div class="h">#8EC2F0<br><span class="r">142·194·240</span></div></div>
+  <div class="sw light" style="background:#A8DEF9"><div class="n">Cyan 300</div><div class="h">#A8DEF9<br><span class="r">168·222·249</span></div></div>
+  <div class="sw light" style="background:#FEE19A"><div class="n">Gold 300</div><div class="h">#FEE19A<br><span class="r">254·225·154</span></div></div>
+  <div class="sw light" style="background:#FF8080"><div class="n">Red 300</div><div class="h">#FF8080<br><span class="r">255·128·128</span></div></div>
+  <div class="sw light" style="background:#E3E3E3"><div class="n">Gray 300</div><div class="h">#E3E3E3<br><span class="r">227·227·227</span></div></div>
+
+  <!-- Row 4 — 100 -->
+  <div class="sw light" style="background:#C3D3EE"><div class="n">Navy 100</div><div class="h">#C3D3EE<br><span class="r">195·211·238</span></div></div>
+  <div class="sw light" style="background:#C7E1F8"><div class="n">Blue 100</div><div class="h">#C7E1F8<br><span class="r">199·225·248</span></div></div>
+  <div class="sw light" style="background:#D4EEFC"><div class="n">Cyan 100</div><div class="h">#D4EEFC<br><span class="r">212·238·252</span></div></div>
+  <div class="sw light" style="background:#FEF0CC"><div class="n">Gold 100</div><div class="h">#FEF0CC<br><span class="r">254·240·204</span></div></div>
+  <div class="sw light" style="background:#FFBFBF"><div class="n">Red 100</div><div class="h">#FFBFBF<br><span class="r">255·191·191</span></div></div>
+  <div class="sw light" style="background:#F1F1F1"><div class="n">Gray 100</div><div class="h">#F1F1F1<br><span class="r">241·241·241</span></div></div>
+</div>
+</body></html>

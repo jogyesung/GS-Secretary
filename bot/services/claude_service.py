@@ -618,7 +618,15 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
 
     except (PermissionError, FileNotFoundError) as e:
         return f"오류: {e}"
+    except RuntimeError as e:
+        err_msg = str(e)
+        if "인증" in err_msg or "drive_auth" in err_msg:
+            return "Google 인증 토큰이 만료되었습니다. 관리자가 토큰을 재발급해야 합니다. 사용자에게 '현재 Google 서비스 토큰이 만료되어 접근할 수 없다'고 알려주세요."
+        return f"도구 실행 오류: {e}"
     except Exception as e:
+        err_msg = str(e).lower()
+        if "invalid_grant" in err_msg or "token" in err_msg and "expired" in err_msg:
+            return "Google OAuth 토큰이 만료되었습니다. 관리자가 토큰을 재발급해야 합니다. 사용자에게 '토큰 만료로 Google 서비스 접근 불가'라고 알려주세요."
         return f"도구 실행 오류: {e}"
 
 

@@ -1,12 +1,15 @@
 """Google Drive OAuth 2.0 인증 관리"""
 
 import json
+import logging
 import os
 from pathlib import Path
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from bot.config import GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE, GOOGLE_SCOPES
+
+logger = logging.getLogger(__name__)
 
 
 def get_drive_credentials() -> Credentials | None:
@@ -15,11 +18,23 @@ def get_drive_credentials() -> Credentials | None:
     token_path = Path(GOOGLE_TOKEN_FILE)
 
     if token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), GOOGLE_SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(str(token_path), GOOGLE_SCOPES)
+        except Exception as e:
+            logger.error(f"토큰 파일 로드 실패: {e}")
+            return None
 
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        _save_token(creds)
+    if not creds:
+        return None
+
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            _save_token(creds)
+            logger.info("Google OAuth 토큰 자동 갱신 성공")
+        except Exception as e:
+            logger.error(f"토큰 갱신 실패 (재인증 필요): {e}")
+            return None
 
     return creds
 

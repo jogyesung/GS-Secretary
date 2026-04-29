@@ -404,12 +404,16 @@ def _build_system_prompt() -> str:
 
     if RUN_MODE in ("cloud", "all"):
         extra += (
+            "\n\n[문서/자료 검색 지침 — 가장 중요]"
+            "\n사용자가 문서, 계약서, 보고서, 자료, 파일, offer letter 등을 찾으면:"
+            "\n1. drive_search와 gmail_search를 **동시에** 호출하세요 (한 번의 응답에 두 도구를 함께 사용)."
+            "\n2. 두 결과를 종합해서 답변하세요."
+            "\n3. 날짜 힌트가 있으면 Gmail에서 after:/before: 쿼리를 활용하세요."
+            "\n예: '24년 2월 계약서 찾아줘' → drive_search('계약서') + gmail_search('계약서 OR offer after:2024/02/01 before:2024/05/01') 동시 호출."
+            "\n절대 한쪽만 검색하고 기다리지 마세요. 항상 Drive + Gmail 병렬 검색!"
             "\n\n[Google Drive 활용 지침]"
-            "\n사용자가 질문하면, 관련 자료가 Google Drive에 있을 수 있습니다."
-            "\n1. drive_search로 관련 파일을 검색하세요."
-            "\n2. 찾은 파일의 ID로 drive_read를 사용해 내용을 읽으세요."
-            "\n3. 파일 내용을 바탕으로 정확하게 답변하세요."
-            "\n사용자가 '내 자료', '내 문서', '보고서', '파일' 등을 언급하면 Drive를 먼저 검색하세요."
+            "\ndrive_search로 키워드 검색 → drive_read로 내용 확인."
+            "\n사용자가 '내 자료', '내 문서', '보고서', '파일' 등을 언급하면 Drive를 검색하세요."
         "\n\n[Google Calendar 활용 지침]"
         "\n사용자가 일정, 스케줄, 회의, 약속 등을 언급하면 Calendar 도구를 사용하세요."
         "\n오늘 날짜를 기준으로 시간을 계산하세요."

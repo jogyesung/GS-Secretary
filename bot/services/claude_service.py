@@ -18,6 +18,10 @@ _pending_files: dict[int, list[str]] = {}
 
 MAX_HISTORY = 20
 
+# 모델 티어: 도구 사용 시 Sonnet, 일반 대화는 Haiku
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
+SONNET_MODEL = CLAUDE_MODEL  # claude-sonnet-4-20250514
+
 
 def _get_client() -> anthropic.AsyncAnthropic:
     if not ANTHROPIC_API_KEY:
@@ -767,23 +771,33 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
         return f"도구 실행 오류: {e}"
 
 
-async def _log_api_usage(user_id: int, input_tokens: int, output_tokens: int, tool_calls: int):
+async def _log_api_usage(user_id: int, input_tokens: int, output_tokens: int, tool_calls: int, model: str = None):
     """API 사용량을 DB에 기록"""
+    used_model = model or CLAUDE_MODEL
     try:
         from bot.services.usage_service import log_usage
-        await log_usage(user_id, CLAUDE_MODEL, input_tokens, output_tokens, tool_calls)
+        await log_usage(user_id, used_model, input_tokens, output_tokens, tool_calls)
         from bot.services.usage_service import estimate_cost
-        cost = estimate_cost(input_tokens, output_tokens, CLAUDE_MODEL)
-        logger.info(f"API 사용량 기록: input={input_tokens}, output={output_tokens}, tools={tool_calls}, cost=${cost:.4f}")
+        cost = estimate_cost(input_tokens, output_tokens, used_model)
+        model_label = "Haiku" if "haiku" in used_model else "Sonnet"
+        logger.info(f"API [{model_label}]: input={input_tokens}, output={output_tokens}, tools={tool_calls}, cost=${cost:.4f}")
     except Exception as e:
         logger.error(f"사용량 기록 실패: {e}")
 
 
-async def chat(user_id: int, message: str) -> str:
-    """Claude와 대화. Tool use를 지원하며 사용자별 히스토리를 유지합니다."""
+async def chat(user_id: int, message: str, use_tools: bool = True) -> str:
+    """Claude와 대화. Tool use를 지원하며 사용자별 히스토리를 유지합니다.
+    use_tools=False이면 도구 없이 Haiku로 가볍게 응답합니다.
+    """
     client = _get_client()
-    tools = _build_tools()
-    system = _build_system_prompt()
+    tools = _build_tools() if use_tools else []
+    system_text = _build_system_prompt()
+
+    # 프롬프트 캐싱: 시스템 프롬프트에 cache_control 적용
+    system = [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
+
+    # 모델 선택: 도구 사용 시 Sonnet, 일반 대화는 Haiku
+    model = SONNET_MODEL if use_tools else HAIKU_MODEL
 
     if user_id not in _conversations:
         _conversations[user_id] = []
@@ -804,6 +818,7 @@ async def chat(user_id: int, message: str) -> str:
     total_input_tokens = 0
     total_output_tokens = 0
     total_tool_calls = 0
+    used_model = model
 
     # 히스토리에서 빈 content 제거 (이전 버그로 인한 잔여 데이터 방어)
     history[:] = [
@@ -811,17 +826,29 @@ async def chat(user_id: int, message: str) -> str:
         if not (isinstance(msg.get("content"), str) and not msg["content"].strip())
     ]
 
-    for _ in range(max_tool_rounds):
+    for round_num in range(max_tool_rounds):
         kwargs = {
-            "model": CLAUDE_MODEL,
+            "model": model,
             "max_tokens": CLAUDE_MAX_TOKENS,
             "system": system,
             "messages": history,
         }
         if tools:
-            kwargs["tools"] = tools
+            # 프롬프트 캐싱: 마지막 도구에 cache_control 적용
+            cached_tools = [t.copy() for t in tools]
+            cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
+            kwargs["tools"] = cached_tools
 
         response = await client.messages.create(**kwargs)
+
+        # 캐시 히트 로깅
+        if hasattr(response, "usage"):
+            cache_read = getattr(response.usage, "cache_read_input_tokens", 0)
+            cache_create = getattr(response.usage, "cache_creation_input_tokens", 0)
+            if cache_read > 0:
+                logger.info(f"프롬프트 캐시 히트: {cache_read} tokens (절감)")
+            elif cache_create > 0:
+                logger.info(f"프롬프트 캐시 생성: {cache_create} tokens")
 
         # 토큰 사용량 누적
         if hasattr(response, "usage"):
@@ -852,7 +879,7 @@ async def chat(user_id: int, message: str) -> str:
 
         else:
             # 사용량 기록
-            await _log_api_usage(user_id, total_input_tokens, total_output_tokens, total_tool_calls)
+            await _log_api_usage(user_id, total_input_tokens, total_output_tokens, total_tool_calls, used_model)
 
             # 최종 텍스트 응답
             text_parts = [block.text for block in response.content if hasattr(block, "text") and block.text]
@@ -861,7 +888,7 @@ async def chat(user_id: int, message: str) -> str:
             return assistant_message
 
     # 도구 호출 초과 시에도 사용량 기록
-    await _log_api_usage(user_id, total_input_tokens, total_output_tokens, total_tool_calls)
+    await _log_api_usage(user_id, total_input_tokens, total_output_tokens, total_tool_calls, used_model)
     return "도구 호출이 너무 많습니다. 다시 시도해주세요."
 
 

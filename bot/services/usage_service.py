@@ -6,7 +6,8 @@ from bot.config import DATABASE_PATH
 
 KST = timezone(timedelta(hours=9))
 
-# Haiku 4.5 가격 (1M 토큰당)
+# 모델별 가격 (1M 토큰당, USD)
+# 캐시 히트 시 input은 90% 할인 (0.1x)
 PRICING = {
     "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
     "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},

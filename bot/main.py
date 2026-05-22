@@ -13,6 +13,7 @@ from bot.config import TELEGRAM_BOT_TOKEN, LOG_LEVEL, TEMP_DOWNLOAD_PATH, RUN_MO
 from bot.database import init_db
 from bot.handlers.start import start_command, help_command, status_command
 from bot.handlers.chat import handle_chat_message, clear_command
+from bot.handlers.voice import handle_voice_message
 
 # 로깅 설정
 logging.basicConfig(
@@ -171,9 +172,22 @@ def main():
         app.add_handler(CommandHandler("usage", usage_command))
         logger.info("API 사용량 핸들러 등록")
 
+    # === 수동 브리핑 ===
+    if RUN_MODE in ("cloud", "all"):
+        from bot.handlers.schedule import briefing_command
+        app.add_handler(CommandHandler("briefing", briefing_command))
+        logger.info("수동 브리핑 핸들러 등록")
+
     # === Claude AI 대화 ===
     if ANTHROPIC_API_KEY:
+        from bot.handlers.photo import handle_photo_message
+        app.add_handler(MessageHandler(filters.PHOTO, handle_photo_message))
+        logger.info("이미지 분석 핸들러 등록 (Claude Vision)")
+
         app.add_handler(CommandHandler("clear", clear_command))
+        # 음성 메시지 → 텍스트 변환 → AI 대화
+        app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice_message))
+        logger.info("음성 메시지 핸들러 등록")
         # 일반 텍스트 메시지 → Claude 대화 (가장 낮은 우선순위)
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_chat_message))
         logger.info("Claude AI 대화 핸들러 등록")

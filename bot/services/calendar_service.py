@@ -105,6 +105,60 @@ async def list_events(days: int = 1, max_results: int = 20) -> list[dict]:
     return await loop.run_in_executor(None, _list)
 
 
+async def check_conflicts(start_time: str, end_time: str) -> list[dict]:
+    """주어진 시간대에 겹치는 일정이 있는지 확인"""
+    loop = asyncio.get_event_loop()
+
+    def _check():
+        service = _get_service()
+
+        # 타임존 처리
+        start = start_time if "+" in start_time or "Z" in start_time else start_time + "+09:00"
+        end = end_time if "+" in end_time or "Z" in end_time else end_time + "+09:00"
+
+        start_clean = start.replace("Z", "+00:00")
+        end_clean = end.replace("Z", "+00:00")
+        start_dt = datetime.fromisoformat(start_clean)
+        end_dt = datetime.fromisoformat(end_clean)
+
+        time_min = start_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        time_max = end_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        cal_list = service.calendarList().list().execute()
+        conflicts = []
+
+        for cal in cal_list.get("items", []):
+            cal_id = cal["id"]
+            try:
+                events_result = (
+                    service.events()
+                    .list(
+                        calendarId=cal_id,
+                        timeMin=time_min,
+                        timeMax=time_max,
+                        singleEvents=True,
+                        orderBy="startTime",
+                    )
+                    .execute()
+                )
+                for event in events_result.get("items", []):
+                    ev_start = event["start"].get("dateTime", event["start"].get("date", ""))
+                    ev_end = event["end"].get("dateTime", event["end"].get("date", ""))
+                    conflicts.append({
+                        "id": event["id"],
+                        "summary": event.get("summary", "(제목 없음)"),
+                        "start": _to_kst(ev_start),
+                        "end": _to_kst(ev_end),
+                        "calendar": cal.get("summary", ""),
+                    })
+            except Exception:
+                continue
+
+        return conflicts
+
+    return await loop.run_in_executor(None, _check)
+
+
 async def create_event(
     summary: str,
     start_time: str,

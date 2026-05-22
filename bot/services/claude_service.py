@@ -604,7 +604,20 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
             return f"일정 ({len(events)}개):\n" + "\n".join(result)
 
         elif tool_name == "calendar_create":
-            from bot.services.calendar_service import create_event
+            from bot.services.calendar_service import create_event, check_conflicts
+            # 충돌 감지: 종일 일정이 아닌 경우 겹치는 일정 확인
+            conflict_warning = ""
+            if not tool_input.get("all_day", False):
+                try:
+                    conflicts = await check_conflicts(tool_input["start_time"], tool_input["end_time"])
+                    if conflicts:
+                        items = []
+                        for c in conflicts:
+                            t = c["start"][11:16] if "T" in c["start"] else "종일"
+                            items.append(f"  - {t} {c['summary']}")
+                        conflict_warning = f"\n⚠️ 충돌 감지! 같은 시간대에 {len(conflicts)}건의 일정이 있어요:\n" + "\n".join(items) + "\n"
+                except Exception:
+                    pass
             event = await create_event(
                 summary=tool_input["summary"],
                 start_time=tool_input["start_time"],
@@ -613,7 +626,7 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 location=tool_input.get("location", ""),
                 all_day=tool_input.get("all_day", False),
             )
-            return f"일정 생성 완료: {event['summary']} ({event['start']})"
+            return f"일정 생성 완료: {event['summary']} ({event['start']}){conflict_warning}"
 
         elif tool_name == "calendar_update":
             from bot.services.calendar_service import update_event

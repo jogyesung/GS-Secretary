@@ -41,6 +41,11 @@ def _build_help_text() -> str:
             "/reminders - 리마인더 목록\n"
             "/remind\\_del <ID> - 리마인더 삭제\n"
         )
+        sections.append(
+            "*브리핑*\n"
+            "/briefing - 오늘의 브리핑 (일정+메일+리마인더)\n"
+            "  매일 오전 7시 자동 발송됩니다.\n"
+        )
 
     if RUN_MODE in ("local", "all"):
         sections.append(
@@ -70,6 +75,9 @@ def _build_help_text() -> str:
         sections.append(
             "*AI 대화*\n"
             "그냥 메시지를 보내면 카리나가 답변합니다.\n"
+            "🎤 음성 메시지도 인식해서 답변합니다.\n"
+            "🖼 사진을 보내면 이미지를 분석합니다.\n"
+            "  캡션을 달면 그에 맞게 분석해요.\n"
             "대화 중 자동으로 PC 파일 접근, 웹 검색도 합니다.\n"
             "/clear - 대화 히스토리 초기화\n"
             "/usage - API 사용량/비용 조회\n"

@@ -444,6 +444,15 @@ def _build_system_prompt() -> str:
     return CLAUDE_SYSTEM_PROMPT + extra
 
 
+async def _queue_slide_file(user_id: int, html_path: str):
+    """슬라이드를 PNG로 렌더링해서 전송 대기열에 추가 (실패 시 HTML)"""
+    from bot.services.slide_render import render_html_to_png
+    png_path = await render_html_to_png(str(html_path))
+    if user_id not in _pending_files:
+        _pending_files[user_id] = []
+    _pending_files[user_id].append(png_path or str(html_path))
+
+
 # === 도구 실행 함수 ===
 async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
     """도구를 실행하고 결과를 반환"""
@@ -711,9 +720,7 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
                 date=tool_input.get("date", ""),
             )
             path = save_generated_slide(html, "cover.html")
-            if user_id not in _pending_files:
-                _pending_files[user_id] = []
-            _pending_files[user_id].append(str(path))
+            await _queue_slide_file(user_id, path)
             return f"표지 슬라이드 생성 완료: {tool_input['title']}. 파일을 텔레그램으로 전송합니다."
 
         elif tool_name == "slide_generate_twocol":
@@ -730,9 +737,7 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
             )
             filename = f"twocol_{tool_input['section_label'][:10].replace(' ', '_')}.html"
             path = save_generated_slide(html, filename)
-            if user_id not in _pending_files:
-                _pending_files[user_id] = []
-            _pending_files[user_id].append(str(path))
+            await _queue_slide_file(user_id, path)
             return f"2단 레이아웃 슬라이드 생성 완료: {tool_input['title']}. 파일을 텔레그램으로 전송합니다."
 
         elif tool_name == "slide_generate_divider":
@@ -744,18 +749,14 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
             )
             filename = f"divider_{tool_input['number'].replace('.', '')}.html"
             path = save_generated_slide(html, filename)
-            if user_id not in _pending_files:
-                _pending_files[user_id] = []
-            _pending_files[user_id].append(str(path))
+            await _queue_slide_file(user_id, path)
             return f"섹션 구분 슬라이드 생성 완료: {tool_input['number']} {tool_input['title']}. 파일을 텔레그램으로 전송합니다."
 
         elif tool_name == "slide_generate_closing":
             from bot.services.slide_service import generate_closing_slide, save_generated_slide
             html = generate_closing_slide()
             path = save_generated_slide(html, "closing.html")
-            if user_id not in _pending_files:
-                _pending_files[user_id] = []
-            _pending_files[user_id].append(str(path))
+            await _queue_slide_file(user_id, path)
             return "종료 슬라이드 생성 완료. 파일을 텔레그램으로 전송합니다."
 
         elif tool_name == "web_search":
@@ -788,6 +789,59 @@ async def _execute_tool(tool_name: str, tool_input: dict, user_id: int) -> str:
         return f"도구 실행 오류: {e}"
 
 
+# === 대화 히스토리 영속화 (봇 재시작 후에도 대화 맥락 유지) ===
+async def _load_history_from_db(user_id: int) -> list[dict]:
+    """DB에서 최근 대화 히스토리 로드 (텍스트 턴만 저장됨)"""
+    try:
+        import aiosqlite
+        from bot.config import DATABASE_PATH
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            rows = await db.execute_fetchall(
+                "SELECT role, content FROM conversations WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+                (user_id, MAX_HISTORY),
+            )
+        messages = [{"role": r[0], "content": r[1]} for r in reversed(rows)]
+        # 첫 메시지는 반드시 user여야 함 (API 제약)
+        while messages and messages[0]["role"] != "user":
+            messages.pop(0)
+        return messages
+    except Exception as e:
+        logger.warning(f"대화 히스토리 로드 실패: {e}")
+        return []
+
+
+async def _save_turn_to_db(user_id: int, role: str, content: str):
+    """대화 턴을 DB에 저장하고 오래된 기록 정리"""
+    try:
+        import aiosqlite
+        from bot.config import DATABASE_PATH
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            await db.execute(
+                "INSERT INTO conversations (user_id, role, content) VALUES (?, ?, ?)",
+                (user_id, role, content),
+            )
+            # 사용자당 최근 40턴만 유지
+            await db.execute(
+                "DELETE FROM conversations WHERE user_id = ? AND id NOT IN "
+                "(SELECT id FROM conversations WHERE user_id = ? ORDER BY id DESC LIMIT 40)",
+                (user_id, user_id),
+            )
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"대화 히스토리 저장 실패: {e}")
+
+
+async def _clear_history_db(user_id: int):
+    try:
+        import aiosqlite
+        from bot.config import DATABASE_PATH
+        async with aiosqlite.connect(DATABASE_PATH) as db:
+            await db.execute("DELETE FROM conversations WHERE user_id = ?", (user_id,))
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"대화 히스토리 삭제 실패: {e}")
+
+
 async def _log_api_usage(user_id: int, input_tokens: int, output_tokens: int, tool_calls: int, model: str = None):
     """API 사용량을 DB에 기록"""
     used_model = model or CLAUDE_MODEL
@@ -817,7 +871,8 @@ async def chat(user_id: int, message: str, use_tools: bool = True) -> str:
     model = SONNET_MODEL if use_tools else HAIKU_MODEL
 
     if user_id not in _conversations:
-        _conversations[user_id] = []
+        # 봇 재시작 후 첫 대화: DB에서 이전 대화 복원
+        _conversations[user_id] = await _load_history_from_db(user_id)
 
     history = _conversations[user_id]
 
@@ -825,6 +880,7 @@ async def chat(user_id: int, message: str, use_tools: bool = True) -> str:
         return "메시지를 입력해주세요."
 
     history.append({"role": "user", "content": message})
+    await _save_turn_to_db(user_id, "user", message)
 
     if len(history) > MAX_HISTORY:
         history = history[-MAX_HISTORY:]
@@ -902,6 +958,7 @@ async def chat(user_id: int, message: str, use_tools: bool = True) -> str:
             text_parts = [block.text for block in response.content if hasattr(block, "text") and block.text]
             assistant_message = "\n".join(text_parts) if text_parts else "처리가 완료되었습니다."
             history.append({"role": "assistant", "content": assistant_message})
+            await _save_turn_to_db(user_id, "assistant", assistant_message)
             return assistant_message
 
     # 도구 호출 초과 시에도 사용량 기록
@@ -914,9 +971,10 @@ def get_pending_files(user_id: int) -> list[str]:
     return _pending_files.pop(user_id, [])
 
 
-def clear_history(user_id: int):
-    """대화 히스토리 초기화"""
+async def clear_history(user_id: int):
+    """대화 히스토리 초기화 (메모리 + DB)"""
     _conversations.pop(user_id, None)
+    await _clear_history_db(user_id)
 
 
 def get_history_length(user_id: int) -> int:

@@ -160,5 +160,5 @@ async def _send_pending_files(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """대화 히스토리 초기화"""
     user_id = update.effective_user.id
-    claude_service.clear_history(user_id)
+    await claude_service.clear_history(user_id)
     await update.message.reply_text("🗑️ 대화 히스토리가 초기화되었습니다.")

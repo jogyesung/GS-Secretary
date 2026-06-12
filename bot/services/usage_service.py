@@ -104,6 +104,21 @@ async def get_daily_breakdown(days: int = 7) -> list[dict]:
         return [{"date": r[0], "input_tokens": r[1], "output_tokens": r[2], "calls": r[3]} for r in rows]
 
 
+async def get_cost_today() -> float:
+    """오늘 총 비용 (모델별 단가로 정확히 합산, USD)"""
+    now = datetime.now(KST)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    utc_start = (today_start - timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        rows = await db.execute_fetchall(
+            "SELECT model, SUM(input_tokens), SUM(output_tokens) FROM api_usage "
+            "WHERE created_at >= ? GROUP BY model",
+            (utc_start,),
+        )
+    return sum(estimate_cost(r[1] or 0, r[2] or 0, r[0]) for r in rows)
+
+
 def estimate_cost(input_tokens: int, output_tokens: int, model: str = "claude-haiku-4-5-20251001") -> float:
     """예상 비용 계산 (USD)"""
     prices = PRICING.get(model, PRICING["claude-haiku-4-5-20251001"])

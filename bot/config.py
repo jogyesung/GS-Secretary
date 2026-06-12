@@ -79,6 +79,12 @@ CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "4096"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
+# DART 전자공시 API (opendart.fss.or.kr에서 발급)
+DART_API_KEY = os.getenv("DART_API_KEY", "")
+
+# 일일 API 비용 한도 (USD) - 초과 시 텔레그램 알림
+DAILY_COST_LIMIT_USD = float(os.getenv("DAILY_COST_LIMIT_USD", "1.0"))
+
 # 실행 모드: cloud (Drive+메모+리마인더), local (PC파일만), all (전부)
 RUN_MODE = os.getenv("RUN_MODE", "all").lower()
 

@@ -30,16 +30,43 @@ async def post_init(application: Application):
     logger.info("데이터베이스 초기화 완료")
 
     if RUN_MODE in ("cloud", "all"):
-        from bot.handlers.schedule import check_reminders, daily_briefing
+        from bot.handlers.schedule import (
+            check_reminders, daily_briefing, weekly_briefing,
+            check_google_token, check_dart_disclosures,
+        )
         from datetime import time as dt_time, timezone, timedelta
         application.job_queue.run_repeating(check_reminders, interval=30, first=5)
         logger.info("리마인더 스케줄러 시작됨")
 
-        # 매일 아침 7시(KST) 브리핑 = UTC 22:00 (전날)
         kst = timezone(timedelta(hours=9))
-        briefing_time = dt_time(hour=7, minute=0, tzinfo=kst)
-        application.job_queue.run_daily(daily_briefing, time=briefing_time)
+
+        # 매일 아침 7시(KST) 브리핑
+        application.job_queue.run_daily(daily_briefing, time=dt_time(hour=7, minute=0, tzinfo=kst))
         logger.info("아침 브리핑 스케줄러 시작됨 (매일 07:00 KST)")
+
+        # 매주 월요일 07:30(KST) 주간 브리핑 (days: 0=월요일)
+        application.job_queue.run_daily(
+            weekly_briefing, time=dt_time(hour=7, minute=30, tzinfo=kst), days=(0,)
+        )
+        logger.info("주간 브리핑 스케줄러 시작됨 (매주 월 07:30 KST)")
+
+        # 매일 09:00(KST) Google 토큰 상태 점검
+        application.job_queue.run_daily(check_google_token, time=dt_time(hour=9, minute=0, tzinfo=kst))
+        logger.info("Google 토큰 점검 스케줄러 시작됨 (매일 09:00 KST)")
+
+        # DART 공시 체크 (30분 주기)
+        from bot.config import DART_API_KEY
+        if DART_API_KEY:
+            application.job_queue.run_repeating(check_dart_disclosures, interval=1800, first=60)
+            logger.info("DART 공시 모니터링 시작됨 (30분 주기)")
+        else:
+            logger.info("DART_API_KEY 미설정 - 공시 모니터링 비활성화")
+
+    # API 비용 한도 알림 (1시간 주기)
+    if ANTHROPIC_API_KEY:
+        from bot.handlers.schedule import check_cost_limit
+        application.job_queue.run_repeating(check_cost_limit, interval=3600, first=300)
+        logger.info("API 비용 한도 알림 시작됨 (1시간 주기)")
 
 
 def _register_cloud_handlers(app: Application):
@@ -123,6 +150,12 @@ def _register_file_handler(app: Application):
             from bot.handlers.files import handle_pc_file_save
             await handle_pc_file_save(update, context)
         else:
+            # 분석 가능한 문서면 카리나가 바로 분석 (PDF/DOCX/XLSX/텍스트)
+            from bot.handlers.document import is_analyzable, analyze_document
+            doc = update.message.document
+            if ANTHROPIC_API_KEY and doc and is_analyzable(doc.file_name):
+                await analyze_document(update, context)
+                return
             options = []
             if RUN_MODE in ("cloud", "all"):
                 options.append("• /drive\\_upload - Google Drive에 업로드")
@@ -177,6 +210,15 @@ def main():
         from bot.handlers.schedule import briefing_command
         app.add_handler(CommandHandler("briefing", briefing_command))
         logger.info("수동 브리핑 핸들러 등록")
+
+    # === 포트폴리오 (DART 공시 알림) ===
+    from bot.handlers.portfolio import (
+        portfolio_command, portfolio_add_command, portfolio_del_command,
+    )
+    app.add_handler(CommandHandler("portfolio", portfolio_command))
+    app.add_handler(CommandHandler("portfolio_add", portfolio_add_command))
+    app.add_handler(CommandHandler("portfolio_del", portfolio_del_command))
+    logger.info("포트폴리오 핸들러 등록")
 
     # === Claude AI 대화 ===
     if ANTHROPIC_API_KEY:

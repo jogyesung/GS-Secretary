@@ -105,7 +105,7 @@ async def _gemini_regular_search(client: genai.Client, query: str) -> dict | Non
 
 
 async def _duckduckgo_search(query: str) -> dict | None:
-    """3단계: DuckDuckGo 검색 (최종 폴백)"""
+    """3단계: DuckDuckGo 검색 (라이브러리)"""
     try:
         from duckduckgo_search import DDGS
 
@@ -131,7 +131,47 @@ async def _duckduckgo_search(query: str) -> dict | None:
         return {"answer": f"[DuckDuckGo 검색]\n{answer}", "sources": sources}
 
     except Exception as e:
-        logger.warning(f"DuckDuckGo 검색 실패: {e}")
+        logger.warning(f"DuckDuckGo 라이브러리 검색 실패: {e}")
+        return None
+
+
+async def _duckduckgo_html_search(query: str) -> dict | None:
+    """4단계: DuckDuckGo HTML 직접 요청 (라이브러리 실패 시 폴백)"""
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(
+                "https://html.duckduckgo.com/html/",
+                params={"q": query, "kl": "kr-kr"},
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            resp.raise_for_status()
+
+        import re
+        results = re.findall(
+            r'<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.*?)</a>.*?'
+            r'<a class="result__snippet"[^>]*>(.*?)</a>',
+            resp.text, re.DOTALL
+        )
+
+        if not results:
+            return None
+
+        answer_parts = []
+        sources = []
+        for href, title, snippet in results[:5]:
+            clean_title = re.sub(r"<.*?>", "", title).strip()
+            clean_snippet = re.sub(r"<.*?>", "", snippet).strip()
+            answer_parts.append(f"• {clean_title}: {clean_snippet}")
+            sources.append(f"[{clean_title}]({href})")
+
+        answer = "\n".join(answer_parts)
+        logger.info("DuckDuckGo HTML 검색 성공")
+        return {"answer": f"[DuckDuckGo 검색]\n{answer}", "sources": sources}
+
+    except Exception as e:
+        logger.warning(f"DuckDuckGo HTML 검색 실패: {e}")
         return None
 
 
@@ -157,8 +197,13 @@ async def search(query: str) -> dict:
         if result:
             return result
 
-    # 3단계: DuckDuckGo 폴백
+    # 3단계: DuckDuckGo 라이브러리
     result = await _duckduckgo_search(query)
+    if result:
+        return result
+
+    # 4단계: DuckDuckGo HTML 직접 요청
+    result = await _duckduckgo_html_search(query)
     if result:
         return result
 

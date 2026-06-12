@@ -56,7 +56,7 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "data" / "gs_secretary
 
 # Claude API
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 CLAUDE_SYSTEM_PROMPT = os.getenv(
     "CLAUDE_SYSTEM_PROMPT",
     "당신의 이름은 '카리나'이고, GS Secretary 텔레그램 업무 비서예요.\n\n"

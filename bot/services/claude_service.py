@@ -20,7 +20,7 @@ MAX_HISTORY = 20
 
 # 모델 티어: 도구 사용 시 Sonnet, 일반 대화는 Haiku
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
-SONNET_MODEL = CLAUDE_MODEL  # claude-sonnet-4-20250514
+SONNET_MODEL = CLAUDE_MODEL  # claude-sonnet-4-6
 
 
 def _get_client() -> anthropic.AsyncAnthropic:

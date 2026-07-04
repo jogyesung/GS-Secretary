@@ -93,12 +93,15 @@ async def fetch_broker_reports(
             continue
         if report_date < cutoff:
             continue
+        # 첨부 셀에서 리포트 원문 PDF 링크 추출 (없는 리포트도 있음)
+        pdf_match = re.search(r'href="(https?://[^"]+\.pdf[^"]*)"', m.group("rest"))
         reports.append(
             {
                 "title": title,
                 "broker": broker,
                 "date": report_date.strftime("%m/%d"),
                 "url": NAVER_RESEARCH_READ_URL.format(nid=m.group("nid")),
+                "pdf_url": pdf_match.group(1) if pdf_match else "",
             }
         )
         if len(reports) >= limit:

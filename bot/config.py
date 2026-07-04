@@ -94,6 +94,12 @@ STOCK_REPORT_TIME = os.getenv("STOCK_REPORT_TIME", "07:20")
 # 아침 종목 리포트 이메일 수신자 (설정 시 로컬 스크립트가 텔레그램 대신 Gmail로 발송)
 STOCK_REPORT_EMAIL_TO = os.getenv("STOCK_REPORT_EMAIL_TO", "")
 
+# 증권사 리포트 원문 PDF 저장 여부 (로컬 스크립트, data/stock_reports/날짜/에 다운로드)
+STOCK_REPORT_SAVE_PDF = os.getenv("STOCK_REPORT_SAVE_PDF", "true").lower() in ("1", "true", "yes")
+
+# PDF를 업로드할 Google Drive 폴더명 (빈 값이면 Drive 업로드 안 함)
+STOCK_REPORT_DRIVE_FOLDER = os.getenv("STOCK_REPORT_DRIVE_FOLDER", "증권사리포트")
+
 # 아침 종목 리포트 모드:
 #   off    - 서버 자동 발송 끔 (기본. PC의 scripts/local_stock_report.py로 실행)
 #   api    - 서버에서 Claude API로 상세검토 후 자동 발송 (API 비용 발생)

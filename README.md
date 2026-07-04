@@ -91,4 +91,7 @@ schtasks /create /tn "아침종목리포트" /sc weekly /d MON,TUE,WED,THU,FRI /
   `credentials.json` + `data/token.json` 필요 — 없으면 `python auth_local.py`로 최초 1회 인증)
 - 이메일 미설정 시 텔레그램으로, 그것도 없으면 화면 출력. `--no-send`는 발송 없이 파일/화면만
 - 결과는 항상 `data/stock_reports/날짜.md`에 저장돼요.
+- **리포트 원문 PDF 아카이빙**: 기본으로 `data/stock_reports/날짜/` 폴더에 PDF를 내려받고,
+  Google Drive의 `증권사리포트/날짜` 폴더에도 자동 업로드해요.
+  (`STOCK_REPORT_SAVE_PDF=false`로 끄기, `STOCK_REPORT_DRIVE_FOLDER=`(빈 값)으로 Drive만 끄기)
 - Claude CLI가 없거나 실패하면 수집한 리포트/뉴스 목록(무료 다이제스트)으로 자동 대체돼요.

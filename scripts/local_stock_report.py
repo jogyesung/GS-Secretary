@@ -21,6 +21,11 @@
     없으면 auth_local.py 실행해서 최초 1회 인증)
 3. 텔레그램: 이메일 미설정이고 TELEGRAM_BOT_TOKEN이 있을 때
 
+증권사 리포트 원문 PDF 아카이빙:
+- STOCK_REPORT_SAVE_PDF=true(기본)면 data/stock_reports/날짜/ 폴더에 PDF 다운로드
+- STOCK_REPORT_DRIVE_FOLDER(기본 '증권사리포트')가 설정돼 있으면
+  Google Drive의 해당 폴더 아래 날짜별 하위 폴더로 자동 업로드
+
 수동 실행: python scripts/local_stock_report.py
 발송 없이 파일/화면으로만 보기: python scripts/local_stock_report.py --no-send
 """
@@ -43,9 +48,12 @@ from bot.config import (
     ALLOWED_USER_IDS,
     BASE_DIR,
     STOCK_REPORT_EMAIL_TO,
+    STOCK_REPORT_SAVE_PDF,
+    STOCK_REPORT_DRIVE_FOLDER,
 )
 from bot.services.stock_research_service import (
     KST,
+    HEADERS,
     ANALYST_SYSTEM_PROMPT,
     collect_watchlist_data,
     format_raw_digest,
@@ -59,6 +67,8 @@ CLAUDE_TIMEOUT_SEC = 600
 MAX_CHUNK = 3500  # 텔레그램 4096자 한도 이내 분할
 
 TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
+REPORTS_DIR = Path(BASE_DIR) / "data" / "stock_reports"
+DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
 
 
 def run_claude_cli(prompt: str) -> str | None:
@@ -87,12 +97,8 @@ def run_claude_cli(prompt: str) -> str | None:
     return (proc.stdout or "").strip() or None
 
 
-def build_report() -> str:
-    """수집 → Claude CLI 상세검토. CLI 실패 시 무료 다이제스트 폴백."""
-    collected = asyncio.run(collect_watchlist_data())
-    if not any(s["reports"] or s["news"] for s in collected):
-        raise RuntimeError("수집된 리포트/뉴스가 없습니다.")
-
+def build_report(collected: list[dict]) -> str:
+    """수집 데이터를 Claude CLI로 상세검토. CLI 실패 시 무료 다이제스트 폴백."""
     now = datetime.now(KST)
     weekdays = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
     prompt = (
@@ -128,11 +134,98 @@ def _split_chunks(text: str, size: int = MAX_CHUNK) -> list[str]:
 
 def save_to_file(text: str) -> Path:
     """리포트를 data/stock_reports/ 아래 날짜별 파일로 저장"""
-    out_dir = Path(BASE_DIR) / "data" / "stock_reports"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{datetime.now(KST).strftime('%Y-%m-%d')}.md"
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = REPORTS_DIR / f"{datetime.now(KST).strftime('%Y-%m-%d')}.md"
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def _safe_filename(name: str, max_len: int = 120) -> str:
+    """파일명에 못 쓰는 문자 제거 및 길이 제한"""
+    name = re.sub(r'[\\/:*?"<>|\n\r\t]', " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name[:max_len]
+
+
+def download_report_pdfs(collected: list[dict]) -> list[Path]:
+    """증권사 리포트 원문 PDF를 data/stock_reports/날짜/ 폴더에 다운로드"""
+    date_dir = REPORTS_DIR / datetime.now(KST).strftime("%Y-%m-%d")
+    saved = []
+    with httpx.Client(timeout=30, follow_redirects=True, headers=HEADERS) as client:
+        for stock in collected:
+            for r in stock["reports"]:
+                pdf_url = r.get("pdf_url", "")
+                if not pdf_url:
+                    continue
+                fname = _safe_filename(
+                    f"{stock['name']}_{r['broker']}_{r['title']}.pdf"
+                )
+                path = date_dir / fname
+                if path.exists():
+                    saved.append(path)
+                    continue
+                try:
+                    resp = client.get(pdf_url)
+                    resp.raise_for_status()
+                    date_dir.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(resp.content)
+                    saved.append(path)
+                    logger.info(f"PDF 저장: {fname}")
+                except Exception as e:
+                    logger.warning(f"PDF 다운로드 실패 ({fname}): {e}")
+    return saved
+
+
+async def _find_or_create_drive_folder(name: str, parent_id: str = "root") -> str:
+    """이름으로 Drive 폴더를 찾고 없으면 생성 (폴더 ID 반환)"""
+    from bot.services.drive_service import create_folder, list_files, search_files
+
+    if parent_id == "root":
+        candidates = await search_files(name)
+    else:
+        candidates = await list_files(parent_id, page_size=100)
+    for f in candidates:
+        if f.get("mimeType") == DRIVE_FOLDER_MIME and f.get("name") == name:
+            return f["id"]
+    folder = await create_folder(name, parent_id=parent_id)
+    return folder["id"]
+
+
+async def upload_pdfs_to_drive(pdf_paths: list[Path]) -> int:
+    """PDF를 Google Drive의 '증권사리포트/날짜' 폴더에 업로드 (같은 이름은 스킵)"""
+    from bot.services.drive_service import list_files, upload_file
+
+    root_id = await _find_or_create_drive_folder(STOCK_REPORT_DRIVE_FOLDER)
+    date_name = datetime.now(KST).strftime("%Y-%m-%d")
+    date_id = await _find_or_create_drive_folder(date_name, parent_id=root_id)
+
+    existing = {f["name"] for f in await list_files(date_id, page_size=100)}
+    uploaded = 0
+    for path in pdf_paths:
+        if path.name in existing:
+            continue
+        await upload_file(str(path), folder_id=date_id)
+        uploaded += 1
+        logger.info(f"Drive 업로드: {path.name}")
+    return uploaded
+
+
+def archive_pdfs(collected: list[dict]) -> str:
+    """PDF 다운로드 + Drive 업로드. 발송 메시지에 붙일 요약 한 줄 반환."""
+    if not STOCK_REPORT_SAVE_PDF:
+        return ""
+    pdfs = download_report_pdfs(collected)
+    if not pdfs:
+        return ""
+
+    note = f"\n\n📎 리포트 원문 PDF {len(pdfs)}건 저장"
+    if STOCK_REPORT_DRIVE_FOLDER:
+        try:
+            asyncio.run(upload_pdfs_to_drive(pdfs))
+            note += f" (Drive: {STOCK_REPORT_DRIVE_FOLDER}/{datetime.now(KST).strftime('%Y-%m-%d')})"
+        except Exception as e:
+            logger.warning(f"Drive 업로드 실패 (PC에는 저장됨): {e}")
+    return note
 
 
 def _markdown_to_plain(text: str) -> str:
@@ -175,7 +268,12 @@ def send_telegram(text: str):
 def main():
     no_send = "--no-send" in sys.argv
     logger.info("아침 종목 리포트 수집 시작")
-    text = build_report()
+    collected = asyncio.run(collect_watchlist_data())
+    if not any(s["reports"] or s["news"] for s in collected):
+        raise RuntimeError("수집된 리포트/뉴스가 없습니다.")
+
+    text = build_report(collected)
+    text += archive_pdfs(collected)
 
     path = save_to_file(text)
     logger.info(f"리포트 파일 저장: {path}")

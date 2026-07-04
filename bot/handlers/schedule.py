@@ -166,14 +166,28 @@ async def briefing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 증시 이벤트도 이어서 발송 (검색에 몇 초 걸릴 수 있음)
+    from bot.config import GEMINI_API_KEY
+    if not GEMINI_API_KEY:
+        await update.message.reply_text(
+            "📈 증시 이벤트 브리핑은 GEMINI_API_KEY 설정 후 이용할 수 있어요."
+        )
+        return
+
     try:
         from bot.services.market_service import get_market_events_briefing
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
         market_text = await get_market_events_briefing()
         if market_text:
             await _send_briefing_message(context.bot, update.effective_chat.id, market_text)
+        else:
+            await update.message.reply_text(
+                "📈 증시 이벤트를 가져오지 못했어요 😥 검색이 일시적으로 실패한 것 같아요. 잠시 후 다시 시도해주세요."
+            )
     except Exception as e:
         logger.warning(f"증시 이벤트 브리핑 실패 ({user_id}): {e}")
+        await update.message.reply_text(
+            "📈 증시 이벤트를 가져오는 중 오류가 발생했어요 😥 잠시 후 다시 시도해주세요."
+        )
 
 
 async def weekly_briefing(context: ContextTypes.DEFAULT_TYPE):

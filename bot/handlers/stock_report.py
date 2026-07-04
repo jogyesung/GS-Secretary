@@ -41,11 +41,30 @@ async def _send_report(bot, chat_id: int, text: str):
 
 
 async def _build_report_text() -> str:
-    """수집 → AI 검토까지 수행한 브리핑 텍스트 생성"""
+    """수집 → AI 검토 → 리포트 원문 PDF Drive 아카이빙까지 수행한 브리핑 텍스트 생성"""
     collected = await stock_research_service.collect_watchlist_data()
     if not any(s["reports"] or s["news"] for s in collected):
         raise RuntimeError("수집된 리포트/뉴스가 없습니다.")
-    return await stock_research_service.build_morning_report(collected)
+    text = await stock_research_service.build_morning_report(collected)
+
+    # 리포트 원문 PDF를 Drive에 아카이빙 (실패해도 브리핑 발송은 계속)
+    try:
+        from datetime import datetime
+        from bot.config import (
+            STOCK_REPORT_SAVE_PDF, STOCK_REPORT_DRIVE_FOLDER, TEMP_DOWNLOAD_PATH,
+        )
+        if STOCK_REPORT_SAVE_PDF and STOCK_REPORT_DRIVE_FOLDER:
+            # 서버 디스크는 휘발성이므로 임시 폴더에 받고 Drive 업로드가 목적
+            dest = TEMP_DOWNLOAD_PATH / "stock_reports" / datetime.now(
+                stock_research_service.KST
+            ).strftime("%Y-%m-%d")
+            text += await stock_research_service.archive_report_pdfs(
+                collected, dest, STOCK_REPORT_DRIVE_FOLDER
+            )
+    except Exception as e:
+        logger.warning(f"리포트 PDF 아카이빙 실패: {e}")
+
+    return text
 
 
 async def morning_stock_report(context: ContextTypes.DEFAULT_TYPE):

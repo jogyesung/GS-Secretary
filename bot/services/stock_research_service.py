@@ -233,6 +233,96 @@ def format_raw_digest(collected: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# === 증권사 리포트 원문 PDF 아카이빙 ===
+DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
+
+
+def _safe_filename(name: str, max_len: int = 120) -> str:
+    """파일명에 못 쓰는 문자 제거 및 길이 제한"""
+    name = re.sub(r'[\\/:*?"<>|\n\r\t]', " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name[:max_len]
+
+
+async def download_report_pdfs(collected: list[dict], dest_dir) -> list:
+    """증권사 리포트 원문 PDF를 dest_dir에 다운로드"""
+    from pathlib import Path
+
+    dest_dir = Path(dest_dir)
+    saved = []
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=HEADERS) as client:
+        for stock in collected:
+            for r in stock["reports"]:
+                pdf_url = r.get("pdf_url", "")
+                if not pdf_url:
+                    continue
+                fname = _safe_filename(f"{stock['name']}_{r['broker']}_{r['title']}.pdf")
+                path = dest_dir / fname
+                if path.exists():
+                    saved.append(path)
+                    continue
+                try:
+                    resp = await client.get(pdf_url)
+                    resp.raise_for_status()
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(resp.content)
+                    saved.append(path)
+                    logger.info(f"PDF 저장: {fname}")
+                except Exception as e:
+                    logger.warning(f"PDF 다운로드 실패 ({fname}): {e}")
+    return saved
+
+
+async def _find_or_create_drive_folder(name: str, parent_id: str = "root") -> str:
+    """이름으로 Drive 폴더를 찾고 없으면 생성 (폴더 ID 반환)"""
+    from bot.services.drive_service import create_folder, list_files, search_files
+
+    if parent_id == "root":
+        candidates = await search_files(name)
+    else:
+        candidates = await list_files(parent_id, page_size=100)
+    for f in candidates:
+        if f.get("mimeType") == DRIVE_FOLDER_MIME and f.get("name") == name:
+            return f["id"]
+    folder = await create_folder(name, parent_id=parent_id)
+    return folder["id"]
+
+
+async def upload_pdfs_to_drive(pdf_paths: list, drive_folder: str) -> int:
+    """PDF를 Google Drive의 '{drive_folder}/날짜' 폴더에 업로드 (같은 이름은 스킵)"""
+    from bot.services.drive_service import list_files, upload_file
+
+    root_id = await _find_or_create_drive_folder(drive_folder)
+    date_name = datetime.now(KST).strftime("%Y-%m-%d")
+    date_id = await _find_or_create_drive_folder(date_name, parent_id=root_id)
+
+    existing = {f["name"] for f in await list_files(date_id, page_size=100)}
+    uploaded = 0
+    for path in pdf_paths:
+        if path.name in existing:
+            continue
+        await upload_file(str(path), folder_id=date_id)
+        uploaded += 1
+        logger.info(f"Drive 업로드: {path.name}")
+    return uploaded
+
+
+async def archive_report_pdfs(collected: list[dict], dest_dir, drive_folder: str = "") -> str:
+    """PDF 다운로드 + (선택) Drive 업로드. 브리핑에 붙일 요약 한 줄 반환."""
+    pdfs = await download_report_pdfs(collected, dest_dir)
+    if not pdfs:
+        return ""
+
+    note = f"\n\n📎 리포트 원문 PDF {len(pdfs)}건 저장"
+    if drive_folder:
+        try:
+            await upload_pdfs_to_drive(pdfs, drive_folder)
+            note += f" (Drive: {drive_folder}/{datetime.now(KST).strftime('%Y-%m-%d')})"
+        except Exception as e:
+            logger.warning(f"Drive 업로드 실패 (파일은 로컬에 저장됨): {e}")
+    return note
+
+
 # === AI 상세검토 ===
 ANALYST_SYSTEM_PROMPT = (
     "당신의 이름은 '카리나'이고, GS Secretary의 증권 리서치 어시스턴트예요.\n"

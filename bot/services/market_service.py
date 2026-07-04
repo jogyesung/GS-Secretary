@@ -46,23 +46,39 @@ def _build_events_query(now: datetime) -> str:
     )
 
 
-def _build_earnings_query(now: datetime) -> str:
+def _build_kr_earnings_query(now: datetime) -> str:
     today, week_end = _date_range(now)
     return (
         f"오늘은 {today}입니다. "
-        f"'이번 주 실적발표 일정', 'earnings calendar this week' 등으로 "
-        f"한국과 미국의 실적발표 캘린더를 검색해서, "
-        f"오늘부터 {week_end}까지 향후 일주일간 실적을 발표하는 대형주를 "
+        f"한국 뉴스에서 '이번 주 실적발표 일정', '잠정실적 발표', '2분기 실적 발표 예정' 등을 "
+        f"검색해서, 오늘부터 {week_end}까지 향후 일주일간 실적(잠정실적 포함)을 발표하는 "
+        f"한국 상장사를 날짜별로 정리해주세요. "
+        f"코스피·코스닥 시가총액 상위 대형주 위주로, 중소형주는 제외하세요. "
+        f"특히 시총 최상위 기업의 분기 잠정실적 발표 예정일은 뉴스 기사에서 꼭 확인하세요. "
+        f"항목 형태: '• 기업명 (잠정/확정, 분기)'. "
+        f"이번 주에 발표가 확인된 기업만 포함하세요. "
+        f"이번 주 발표가 없으면 목록 대신 딱 한 줄로 "
+        f"'이번 주는 국내 대형주 실적발표가 없어요' 형태로 답하세요. "
+        f"전체 400자 이내."
+        + _FORMAT_RULES
+    )
+
+
+def _build_global_earnings_query(now: datetime) -> str:
+    today, week_end = _date_range(now)
+    return (
+        f"오늘은 {today}입니다. "
+        f"'earnings calendar this week' 등으로 미국 실적발표 캘린더를 검색해서, "
+        f"오늘부터 {week_end}까지 향후 일주일간 실적을 발표하는 해외 대형주를 "
         f"날짜별로 정리해주세요.\n"
-        f"1. 한국: 코스피·코스닥 시가총액 상위 대형주 (잠정실적 발표 포함)\n"
-        f"2. 미국: S&P500 대형주, 빅테크, 주요 은행\n"
-        f"3. 그 외 글로벌 증시에 영향이 큰 해외 대형주 (TSMC, ASML 등)\n"
+        f"1. 미국: S&P500 대형주, 빅테크, 주요 은행\n"
+        f"2. 그 외 글로벌 증시에 영향이 큰 해외 대형주 (TSMC, ASML 등)\n"
         f"중소형주는 제외하고 시장에 영향이 큰 대형주만 포함하세요. "
         f"항목 형태: '• 기업명 (잠정/확정, 분기)'. "
         f"이번 주에 발표가 확인된 기업만 포함하세요. "
         f"이번 주 발표가 없으면 목록 대신 딱 한 줄로 "
-        f"'이번 주는 주요 대형주 실적발표가 없어요. 다음 실적 시즌: OOO' 형태로 답하세요. "
-        f"전체 600자 이내."
+        f"'이번 주는 해외 대형주 실적발표가 없어요. 다음 실적 시즌: OOO' 형태로 답하세요. "
+        f"전체 400자 이내."
         + _FORMAT_RULES
     )
 
@@ -102,20 +118,24 @@ async def get_market_events_briefing() -> str | None:
         return None
 
     now = datetime.now(KST)
-    events_result, earnings_result = await asyncio.gather(
+    events_result, kr_result, global_result = await asyncio.gather(
         _safe_search(_build_events_query(now)),
-        _safe_search(_build_earnings_query(now)),
+        _safe_search(_build_kr_earnings_query(now)),
+        _safe_search(_build_global_earnings_query(now)),
     )
 
     events = _clean_answer(events_result)
-    earnings = _clean_answer(earnings_result)
+    kr_earnings = _clean_answer(kr_result)
+    global_earnings = _clean_answer(global_result)
 
-    if not events and not earnings:
+    if not events and not kr_earnings and not global_earnings:
         return None
 
     parts = ["📈 *이번 주 증시 이벤트*"]
-    if earnings:
-        parts.append(f"\n💰 *주요 실적발표*\n{earnings}")
+    if kr_earnings:
+        parts.append(f"\n💰 *실적발표 (한국)*\n{kr_earnings}")
+    if global_earnings:
+        parts.append(f"\n💰 *실적발표 (미국·글로벌)*\n{global_earnings}")
     if events:
         parts.append(f"\n🗓 *경제지표·중앙은행*\n{events}")
 

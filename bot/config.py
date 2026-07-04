@@ -92,10 +92,10 @@ STOCK_WATCHLIST = os.getenv(
 STOCK_REPORT_TIME = os.getenv("STOCK_REPORT_TIME", "07:20")
 
 # 아침 종목 리포트 모드:
-#   api    - Claude API로 상세검토 (기본, API 비용 발생)
-#   digest - 수집한 리포트/뉴스 목록만 발송 (무료)
-#   off    - 서버 자동 발송 끔 (PC의 scripts/local_stock_report.py로 대체할 때)
-STOCK_REPORT_MODE = os.getenv("STOCK_REPORT_MODE", "api").lower()
+#   off    - 서버 자동 발송 끔 (기본. PC의 scripts/local_stock_report.py로 실행)
+#   api    - 서버에서 Claude API로 상세검토 후 자동 발송 (API 비용 발생)
+#   digest - 수집한 리포트/뉴스 목록만 자동 발송 (무료)
+STOCK_REPORT_MODE = os.getenv("STOCK_REPORT_MODE", "off").lower()
 
 # 일일 API 비용 한도 (USD) - 초과 시 텔레그램 알림
 DAILY_COST_LIMIT_USD = float(os.getenv("DAILY_COST_LIMIT_USD", "1.0"))

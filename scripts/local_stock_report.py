@@ -12,10 +12,13 @@
    schtasks /create /tn "아침종목리포트" /sc weekly /d MON,TUE,WED,THU,FRI /st 07:20 ^
      /tr "python C:\\경로\\GS-Secretary\\scripts\\local_stock_report.py"
 
-서버(Railway) 봇의 중복 발송과 API 과금을 막으려면 서버 환경변수에
-STOCK_REPORT_MODE=off 를 설정하세요. (digest로 두면 서버는 무료 목록만 발송)
+서버 자동 발송은 기본으로 꺼져 있어요 (STOCK_REPORT_MODE 기본값 off).
 
 수동 실행: python scripts/local_stock_report.py
+텔레그램 없이 파일/화면으로만 보기: python scripts/local_stock_report.py --no-send
+(.env에 TELEGRAM_BOT_TOKEN이 없으면 자동으로 파일 저장 모드로 동작)
+
+결과 파일은 data/stock_reports/ 아래에 날짜별로 저장돼요.
 """
 
 import asyncio
@@ -30,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx
 
-from bot.config import TELEGRAM_BOT_TOKEN, ALLOWED_USER_IDS
+from bot.config import TELEGRAM_BOT_TOKEN, ALLOWED_USER_IDS, BASE_DIR
 from bot.services.stock_research_service import (
     KST,
     ANALYST_SYSTEM_PROMPT,
@@ -113,11 +116,17 @@ def _split_chunks(text: str, size: int = MAX_CHUNK) -> list[str]:
     return chunks
 
 
+def save_to_file(text: str) -> Path:
+    """리포트를 data/stock_reports/ 아래 날짜별 파일로 저장"""
+    out_dir = Path(BASE_DIR) / "data" / "stock_reports"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{datetime.now(KST).strftime('%Y-%m-%d')}.md"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 def send_telegram(text: str):
     """텔레그램 발송 (Markdown 파싱 실패 시 일반 텍스트로 재시도)"""
-    if not TELEGRAM_BOT_TOKEN or not ALLOWED_USER_IDS:
-        raise RuntimeError(".env에 TELEGRAM_BOT_TOKEN / ALLOWED_USER_IDS를 설정하세요.")
-
     url = TELEGRAM_API_URL.format(token=TELEGRAM_BOT_TOKEN)
     with httpx.Client(timeout=30) as client:
         for user_id in ALLOWED_USER_IDS:
@@ -137,9 +146,19 @@ def send_telegram(text: str):
 
 
 def main():
+    no_send = "--no-send" in sys.argv
     logger.info("아침 종목 리포트 수집 시작")
     text = build_report()
-    send_telegram(text)
+
+    path = save_to_file(text)
+    logger.info(f"리포트 파일 저장: {path}")
+
+    if not no_send and TELEGRAM_BOT_TOKEN and ALLOWED_USER_IDS:
+        send_telegram(text)
+    else:
+        print("\n" + "=" * 60 + "\n")
+        print(text)
+
     logger.info("아침 종목 리포트 완료")
 
 

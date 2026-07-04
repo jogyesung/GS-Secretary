@@ -91,6 +91,9 @@ STOCK_WATCHLIST = os.getenv(
 # 아침 종목 리포트 발송 시각 (KST, HH:MM)
 STOCK_REPORT_TIME = os.getenv("STOCK_REPORT_TIME", "07:20")
 
+# 아침 종목 리포트 이메일 수신자 (설정 시 로컬 스크립트가 텔레그램 대신 Gmail로 발송)
+STOCK_REPORT_EMAIL_TO = os.getenv("STOCK_REPORT_EMAIL_TO", "")
+
 # 아침 종목 리포트 모드:
 #   off    - 서버 자동 발송 끔 (기본. PC의 scripts/local_stock_report.py로 실행)
 #   api    - 서버에서 Claude API로 상세검토 후 자동 발송 (API 비용 발생)

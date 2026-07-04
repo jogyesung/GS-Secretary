@@ -14,15 +14,20 @@
 
 서버 자동 발송은 기본으로 꺼져 있어요 (STOCK_REPORT_MODE 기본값 off).
 
-수동 실행: python scripts/local_stock_report.py
-텔레그램 없이 파일/화면으로만 보기: python scripts/local_stock_report.py --no-send
-(.env에 TELEGRAM_BOT_TOKEN이 없으면 자동으로 파일 저장 모드로 동작)
+전달 채널 (우선순위 순):
+1. 파일 저장: data/stock_reports/날짜.md — 항상 저장
+2. Gmail: .env에 STOCK_REPORT_EMAIL_TO=내주소@gmail.com 설정 시
+   (카리나의 Google 인증 재사용 - credentials.json + data/token.json 필요,
+    없으면 auth_local.py 실행해서 최초 1회 인증)
+3. 텔레그램: 이메일 미설정이고 TELEGRAM_BOT_TOKEN이 있을 때
 
-결과 파일은 data/stock_reports/ 아래에 날짜별로 저장돼요.
+수동 실행: python scripts/local_stock_report.py
+발송 없이 파일/화면으로만 보기: python scripts/local_stock_report.py --no-send
 """
 
 import asyncio
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -33,7 +38,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx
 
-from bot.config import TELEGRAM_BOT_TOKEN, ALLOWED_USER_IDS, BASE_DIR
+from bot.config import (
+    TELEGRAM_BOT_TOKEN,
+    ALLOWED_USER_IDS,
+    BASE_DIR,
+    STOCK_REPORT_EMAIL_TO,
+)
 from bot.services.stock_research_service import (
     KST,
     ANALYST_SYSTEM_PROMPT,
@@ -125,6 +135,23 @@ def save_to_file(text: str) -> Path:
     return path
 
 
+def _markdown_to_plain(text: str) -> str:
+    """텔레그램 Markdown을 이메일용 평문으로 변환 (*굵게* 제거, [제목](URL) → 제목 - URL)"""
+    text = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r"\1 - \2", text)
+    return text.replace("*", "")
+
+
+def send_gmail(text: str):
+    """카리나의 Gmail 연동으로 리포트 이메일 발송"""
+    from bot.services.gmail_service import send_email
+
+    now = datetime.now(KST)
+    weekdays = ["월", "화", "수", "목", "금", "토", "일"]
+    subject = f"📈 아침 종목 리포트 {now.strftime('%Y-%m-%d')} ({weekdays[now.weekday()]})"
+    asyncio.run(send_email(to=STOCK_REPORT_EMAIL_TO, subject=subject, body=_markdown_to_plain(text)))
+    logger.info(f"Gmail 발송 완료: {STOCK_REPORT_EMAIL_TO}")
+
+
 def send_telegram(text: str):
     """텔레그램 발송 (Markdown 파싱 실패 시 일반 텍스트로 재시도)"""
     url = TELEGRAM_API_URL.format(token=TELEGRAM_BOT_TOKEN)
@@ -153,7 +180,9 @@ def main():
     path = save_to_file(text)
     logger.info(f"리포트 파일 저장: {path}")
 
-    if not no_send and TELEGRAM_BOT_TOKEN and ALLOWED_USER_IDS:
+    if not no_send and STOCK_REPORT_EMAIL_TO:
+        send_gmail(text)
+    elif not no_send and TELEGRAM_BOT_TOKEN and ALLOWED_USER_IDS:
         send_telegram(text)
     else:
         print("\n" + "=" * 60 + "\n")

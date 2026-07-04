@@ -87,5 +87,8 @@ schtasks /create /tn "아침종목리포트" /sc weekly /d MON,TUE,WED,THU,FRI /
 ```
 
 - 수동 실행: `python scripts/local_stock_report.py`
-- 텔레그램 없이 파일/화면으로만 보기: `--no-send` 옵션 (결과는 `data/stock_reports/날짜.md`에 항상 저장)
+- **Gmail로 받기**: `.env`에 `STOCK_REPORT_EMAIL_TO=내주소@gmail.com` 설정 (카리나의 Google 인증 재사용,
+  `credentials.json` + `data/token.json` 필요 — 없으면 `python auth_local.py`로 최초 1회 인증)
+- 이메일 미설정 시 텔레그램으로, 그것도 없으면 화면 출력. `--no-send`는 발송 없이 파일/화면만
+- 결과는 항상 `data/stock_reports/날짜.md`에 저장돼요.
 - Claude CLI가 없거나 실패하면 수집한 리포트/뉴스 목록(무료 다이제스트)으로 자동 대체돼요.

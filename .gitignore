@@ -27,6 +27,9 @@ data/temp/
 # Generated slides
 data/slides/
 
+# Generated stock reports
+data/stock_reports/
+
 # IDE
 .vscode/
 .idea/

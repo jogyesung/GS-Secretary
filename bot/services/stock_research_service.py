@@ -18,6 +18,7 @@ from bot.config import (
     ANTHROPIC_API_KEY,
     CLAUDE_MODEL,
     STOCK_WATCHLIST,
+    STOCK_REPORT_MODE,
     ALLOWED_USER_IDS,
 )
 
@@ -253,8 +254,11 @@ ANALYST_SYSTEM_PROMPT = (
 
 
 async def build_morning_report(collected: list[dict]) -> str:
-    """수집 데이터를 Claude로 상세 검토하여 아침 브리핑 생성. 실패 시 원본 다이제스트 폴백."""
-    if not ANTHROPIC_API_KEY:
+    """수집 데이터를 Claude로 상세 검토하여 아침 브리핑 생성. 실패 시 원본 다이제스트 폴백.
+
+    STOCK_REPORT_MODE=digest이면 API를 호출하지 않고 무료 다이제스트만 반환합니다.
+    """
+    if STOCK_REPORT_MODE == "digest" or not ANTHROPIC_API_KEY:
         return format_raw_digest(collected)
 
     now = datetime.now(KST)

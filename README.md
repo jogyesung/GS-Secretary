@@ -69,3 +69,20 @@ docker-compose up -d
 | `/memo <내용>` | 메모 저장 |
 | `/remind <시간> <메시지>` | 리마인더 설정 |
 | `/stock_report` | 아침 종목 리포트 즉시 요청 (평일 07:20 KST 자동 발송) |
+
+## 아침 종목 리포트를 무료로 돌리기 (PC + Claude 구독)
+
+서버에서 Claude API로 검토하면 토큰 비용이 들어요. PC에 Claude Code를 설치하고
+구독 계정으로 로그인하면, 같은 검토를 **API 비용 없이** 구독 요금제 안에서 돌릴 수 있어요.
+
+1. PC에 Claude Code 설치 + 로그인: `npm install -g @anthropic-ai/claude-code` → `claude`
+2. 서버(Railway) 환경변수에 `STOCK_REPORT_MODE=off` 설정 (중복 발송/과금 방지)
+3. 윈도우 작업 스케줄러에 평일 아침 등록:
+
+```
+schtasks /create /tn "아침종목리포트" /sc weekly /d MON,TUE,WED,THU,FRI /st 07:20 ^
+  /tr "python C:\경로\GS-Secretary\scripts\local_stock_report.py"
+```
+
+수동 실행은 `python scripts/local_stock_report.py`. Claude CLI가 없거나 실패하면
+수집한 리포트/뉴스 목록(무료 다이제스트)으로 자동 대체돼요.

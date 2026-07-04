@@ -63,16 +63,22 @@ async def post_init(application: Application):
             logger.info("DART_API_KEY 미설정 - 공시 모니터링 비활성화")
 
     # 아침 종목 리포트 (평일, KST) - 증권사 리포트 + 종목 뉴스 취합 후 AI 상세검토
-    from bot.config import STOCK_REPORT_TIME
-    from bot.handlers.stock_report import morning_stock_report
-    try:
-        _hour, _minute = (int(x) for x in STOCK_REPORT_TIME.split(":"))
-        report_time = dt_time(hour=_hour, minute=_minute, tzinfo=kst)
-    except ValueError:
-        report_time = dt_time(hour=7, minute=20, tzinfo=kst)
-    # days: 0=일요일 ~ 6=토요일 → 평일(월~금)만 발송 (증권사 리포트는 평일에만 발간)
-    application.job_queue.run_daily(morning_stock_report, time=report_time, days=(1, 2, 3, 4, 5))
-    logger.info(f"아침 종목 리포트 스케줄러 시작됨 (평일 {report_time.strftime('%H:%M')} KST)")
+    # STOCK_REPORT_MODE=off면 서버 자동 발송 끔 (PC의 scripts/local_stock_report.py로 대체 가능)
+    from bot.config import STOCK_REPORT_TIME, STOCK_REPORT_MODE
+    if STOCK_REPORT_MODE != "off":
+        from bot.handlers.stock_report import morning_stock_report
+        try:
+            _hour, _minute = (int(x) for x in STOCK_REPORT_TIME.split(":"))
+            report_time = dt_time(hour=_hour, minute=_minute, tzinfo=kst)
+        except ValueError:
+            report_time = dt_time(hour=7, minute=20, tzinfo=kst)
+        # days: 0=일요일 ~ 6=토요일 → 평일(월~금)만 발송 (증권사 리포트는 평일에만 발간)
+        application.job_queue.run_daily(morning_stock_report, time=report_time, days=(1, 2, 3, 4, 5))
+        logger.info(
+            f"아침 종목 리포트 스케줄러 시작됨 (평일 {report_time.strftime('%H:%M')} KST, 모드: {STOCK_REPORT_MODE})"
+        )
+    else:
+        logger.info("아침 종목 리포트 자동 발송 비활성화 (STOCK_REPORT_MODE=off)")
 
     # API 비용 한도 알림 (1시간 주기)
     if ANTHROPIC_API_KEY:

@@ -49,6 +49,13 @@ def _build_help_text() -> str:
         )
 
     sections.append(
+        "*아침 종목 리포트*\n"
+        "/stock\\_report - 증권사 리포트+종목 뉴스 AI 브리핑\n"
+        "  평일 아침 7시 20분에 자동으로 보내드려요.\n"
+        "  대상 종목: 삼성전자, SK하이닉스, 현대차, 구글\n"
+    )
+
+    sections.append(
         "*포트폴리오 (DART 공시 알림)*\n"
         "/portfolio - 내 종목 목록\n"
         "/portfolio\\_add <종목명> - 종목 추가\n"

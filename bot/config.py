@@ -82,6 +82,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 # DART 전자공시 API (opendart.fss.or.kr에서 발급)
 DART_API_KEY = os.getenv("DART_API_KEY", "")
 
+# 아침 종목 리포트 워치리스트 ('이름:코드' 쉼표 구분, 6자리 숫자=국내 종목코드, 그 외=해외 티커)
+STOCK_WATCHLIST = os.getenv(
+    "STOCK_WATCHLIST",
+    "삼성전자:005930,SK하이닉스:000660,현대차:005380,구글:GOOGL",
+)
+
+# 아침 종목 리포트 발송 시각 (KST, HH:MM)
+STOCK_REPORT_TIME = os.getenv("STOCK_REPORT_TIME", "07:20")
+
 # 일일 API 비용 한도 (USD) - 초과 시 텔레그램 알림
 DAILY_COST_LIMIT_USD = float(os.getenv("DAILY_COST_LIMIT_USD", "1.0"))
 

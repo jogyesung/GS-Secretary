@@ -119,18 +119,32 @@ async def _build_briefing_text(user_id: int = None) -> str:
     return "\n".join(lines)
 
 
+async def _send_briefing_message(bot, chat_id: int, text: str):
+    """Markdown으로 발송, 파싱 오류 시 일반 텍스트로 재시도"""
+    try:
+        await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+    except Exception:
+        await bot.send_message(chat_id=chat_id, text=text)
+
+
 async def daily_briefing(context: ContextTypes.DEFAULT_TYPE):
     """매일 아침 오늘 일정 브리핑 (자동 스케줄)"""
     try:
         text = await _build_briefing_text()
 
+        # 증시 이벤트 (실적발표/경제지표/중앙은행) - 검색 실패 시 생략
+        market_text = None
+        try:
+            from bot.services.market_service import get_market_events_briefing
+            market_text = await get_market_events_briefing()
+        except Exception as e:
+            logger.warning(f"증시 이벤트 브리핑 실패: {e}")
+
         for user_id in ALLOWED_USER_IDS:
             try:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=text,
-                    parse_mode="Markdown",
-                )
+                await _send_briefing_message(context.bot, user_id, text)
+                if market_text:
+                    await _send_briefing_message(context.bot, user_id, market_text)
                 logger.info(f"아침 브리핑 발송 완료: {user_id}")
             except Exception as e:
                 logger.error(f"아침 브리핑 발송 실패 ({user_id}): {e}")
@@ -149,6 +163,17 @@ async def briefing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"수동 브리핑 실패 ({user_id}): {e}")
         await update.message.reply_text("😥 브리핑 생성 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
+        return
+
+    # 증시 이벤트도 이어서 발송 (검색에 몇 초 걸릴 수 있음)
+    try:
+        from bot.services.market_service import get_market_events_briefing
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        market_text = await get_market_events_briefing()
+        if market_text:
+            await _send_briefing_message(context.bot, update.effective_chat.id, market_text)
+    except Exception as e:
+        logger.warning(f"증시 이벤트 브리핑 실패 ({user_id}): {e}")
 
 
 async def weekly_briefing(context: ContextTypes.DEFAULT_TYPE):

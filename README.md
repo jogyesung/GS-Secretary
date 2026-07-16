@@ -95,3 +95,16 @@ schtasks /create /tn "아침종목리포트" /sc weekly /d MON,TUE,WED,THU,FRI /
   Google Drive의 `증권사리포트/날짜` 폴더에도 자동 업로드해요.
   (`STOCK_REPORT_SAVE_PDF=false`로 끄기, `STOCK_REPORT_DRIVE_FOLDER=`(빈 값)으로 Drive만 끄기)
 - Claude CLI가 없거나 실패하면 수집한 리포트/뉴스 목록(무료 다이제스트)으로 자동 대체돼요.
+
+## 저축은행·캐피탈 상장사 사업보고서 수집 (무료)
+
+DART에서 상장사를 이름 키워드로 골라 최근 정기보고서(사업보고서→반기→분기)와
+증권사 리포트 PDF를 받아 Google Drive `사업보고서/날짜` 폴더에 올려요.
+
+```
+python scripts/collect_sector_filings.py              # 기본: 저축은행, 캐피탈
+python scripts/collect_sector_filings.py 저축은행 캐피탈 카드   # 키워드 지정
+python scripts/collect_sector_filings.py --no-drive   # PC 저장만
+```
+
+`.env`에 `DART_API_KEY`(opendart.fss.or.kr 무료 발급) 필요. PC에는 `data/filings/날짜/`에 저장돼요.

@@ -281,7 +281,9 @@ function build(data) {
   if (data.date) children.push(para([runs(`Date: ${data.date}`, { bold: true })]));
   {
     let att = `Attendee: ${data.attendee || ''}`;
-    if (data.interviewee) att += `  |  Interviewee : ${data.interviewee}`;
+    if (data.interviewee) {
+      att += `  |  ${data.intervieweeLabel || 'Interviewee'} : ${data.interviewee}`;
+    }
     children.push(para([runs(att, { bold: true })], { after: 120 }));
   }
 

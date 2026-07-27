@@ -58,6 +58,14 @@ Note: ...  Source: ...               ← 7.5pt italic #999999 (해당 시)
 - 푸터: 하단 중앙 `현재쪽/전체쪽` (예: 1/6)
 - 각주: 페이지 하단, 8pt, #595959
 
+**Attendee 행 작성법** — 미팅 성격에 따라 둘 중 하나:
+
+- **전문가 인터뷰** (Union 방식): `attendee`에 아군만, 상대는 `interviewee`에.
+  라벨을 바꿔야 하면 `intervieweeLabel` (기본 "Interviewee")
+- **일반 미팅** (White 방식): `interviewee`를 쓰지 않고 `attendee` 한 줄에
+  조직명 라벨로 전원 표기 — `"CIP: 김진만 상무, 조계승 이사 / 한빛로지스: 정우성 대표, 박미영 CFO"`.
+  경영진 미팅 상대를 "Interviewee"로 표기하지 않는다
+
 ## 3. 불릿·강조 규칙
 
 - 1단계 불릿 접두사는 `- ` (하이픈+공백), 2단계는 `· ` — 빌더가 자동으로 붙이므로 JSON 텍스트에는 넣지 않는다
@@ -88,6 +96,10 @@ Note: ...  Source: ...               ← 7.5pt italic #999999 (해당 시)
 
 표 아래 `Source:`/`Note:` 행은 표 데이터의 출처·유보 표기에 사용한다 (각주와 구분).
 
+**중복 규칙**: 같은 유보 사항이 여러 곳(예: Executive Summary와 표)에 나오면
+각주는 **첫 등장 위치에 한 번만** 달고, 표에서는 `Note:` 행으로 표기한다.
+같은 각주를 문서 곳곳에 반복하지 않는다.
+
 ## 6. 빌더 입력 JSON 스키마
 
 ```jsonc
@@ -95,8 +107,9 @@ Note: ...  Source: ...               ← 7.5pt italic #999999 (해당 시)
   "title": "Project Union Meeting Note",   // "Project {코드명} Meeting Note"
   "subject": "캐피탈(산은캐피탈) 출신 전문가 인터뷰 : 캐피탈 업계 전문가",
   "date": "2026-07-24 (금) 17:00~18:00",   // 시간 미상이면 날짜만
-  "attendee": "김진만 상무, 조계승 이사",     // 아군(CIP) 참석자
-  "interviewee": "산은캐피탈 출신 전문가",    // 선택. 인터뷰·상대방이 있으면
+  "attendee": "김진만 상무, 조계승 이사",     // 인터뷰: 아군만 / 일반 미팅: 조직 라벨로 전원
+  "interviewee": "산은캐피탈 출신 전문가",    // 선택. 인터뷰일 때만 사용
+  "intervieweeLabel": "Interviewee",        // 선택. 상대방 라벨 교체 시
   "logo": true,                             // 선택. false면 로고 생략
   "logoPath": "...",                        // 선택. 로고 파일 경로 교체
 
@@ -143,19 +156,23 @@ Note: ...  Source: ...               ← 7.5pt italic #999999 (해당 시)
 ## 7. 실행·검증
 
 ```bash
-# docx 패키지가 없으면: npm install docx  (스크래치 디렉토리에서)
-node skills/meeting-summary/scripts/build_meeting_note.js note.json "Project_X_미팅노트_260727.docx"
+# docx 패키지가 없으면: npm install docx  (스크래치 디렉토리에서, NODE_PATH로 참조)
+# 스크립트 경로는 이 스킬 디렉토리 기준 — 항상 절대 경로로 실행하는 것이 안전
+node {스킬 경로}/scripts/build_meeting_note.js note.json "Project_X_미팅노트_260727.docx"
 
 # 렌더링 검증 (docx 스킬 동일 패턴)
 soffice --headless --convert-to pdf --outdir . output.docx
 pdftoppm -jpeg -r 90 output.pdf page   # page-*.jpg 를 열어 눈으로 확인
 ```
 
-확인 항목: 로고·제목 구분선 표시 / Executive Summary 소제목 번호 / 표 잘림 없음 /
-각주 마커·본문 대응 / E.O.D / 페이지 푸터 / 색상은 흑백·회색 계열만.
+확인 항목: 로고·제목 구분선 표시 / Executive Summary 소제목 번호 / 표 폭이 페이지를
+벗어나거나 셀 텍스트가 잘리지 않는지(표가 페이지 경계에서 나뉘는 것은 정상 — 머리행이
+자동 반복됨) / 각주 마커·본문 대응 / E.O.D / 페이지 푸터 / 색상은 흑백·회색 계열만.
 
 ## 8. 파일명 규칙
 
 - 국문: `Project_{코드명}_{주제 또는 차수}_{YYMMDD}.docx` (예: `Project_Union_산은캐피탈 인터뷰_260727.docx`)
+- `{YYMMDD}`는 **노트 작성일**(오늘) — 회의일이 아니다. 회의일은 본문 `Date:`에 있다
+  (하우스 관행: 참조 문서 두 건 모두 회의 다음날 작성일로 명명됨)
 - 영문판: 동일 이름 + `_ENG` 접미사
 - 차수가 있는 정기 미팅이면 주제 자리에 `미팅노트 N차`

@@ -1,0 +1,17 @@
+{
+  "skill_name": "meeting-summary",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "이 녹취록으로 회의록 정리해줘. Project Han 건이고 참석자는 우리쪽 김진만 상무, 조계승 이사, 회사쪽은 정우성 대표, 박미영 CFO야.",
+      "expected_output": "CIP 하우스 양식 .docx 미팅노트 1부: 로고+제목 구분선, 소제목 있는 Executive Summary, 번호 섹션(수주/실적/자금조달/경쟁력/재무·인력), 파이프라인 표(Source 표기), STT 오인식('카펙스'→CAPEX, '에비따'→EBITDA 등) 교정, 모호한 수치('월 팔천')는 각주로 재확인 표시, 대표의 전망성 발언은 주체 귀속, E.O.D와 쪽번호. 잡담·인사말 제거.",
+      "files": ["fixtures/transcript_han.txt"]
+    },
+    {
+      "id": 2,
+      "prompt": "Here is the transcript of our expert call with a former logistics-automation executive (conducted in English). Please write it up as a meeting note. Our side: 김진만 상무, 조계승 이사.",
+      "expected_output": "동일 구조의 미팅노트 두 벌(.docx): 국문판 + _ENG 접미사 영문판. 섹션·소제목·각주 개수 일치, 수치 동일. 영문 의역·재요약 없이 국문판과 대응.",
+      "files": ["fixtures/transcript_expert_call_eng.txt"]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+[Auto-transcribed - Project Han expert call, 2026-07-22 21:00 KST / 08:00 EDT]
+Participants: CIP - JM Kim (MD), GS Cho (Director) / Expert - former SVP of Operations at a US warehouse-automation integrator
+
+JM Kim: Thanks for taking the time. As mentioned over email, we are looking at a Korean warehouse automation company, and we'd love your view on the industry economics.
+
+Expert: Sure, happy to help. So, um, the first thing I always tell investors is that this industry looks like a product business but it's really a services business. The margin is not in the hardware. Hardware is, you know, sixty to sixty five percent of contract value but it's basically pass-through, you make maybe ten points of gross margin on it. The money is in the software license and the maintenance contract. On those we would make seventy plus and forty five to fifty points respectively.
+
+GS Cho: How sticky are the maintenance contracts in your experience?
+
+Expert: Very sticky. Once your WMS, sorry, warehouse management system, is running a customer's fulfillment, switching cost is enormous. We had, uh, I think churn was under three percent annually. The only time we lost accounts was when the customer went bankrupt or got acquired. But, and this is important, stickiness only kicks in after go-live. During implementation, projects get cancelled all the time. I'd say fifteen, maybe twenty percent of signed contracts never reach go-live. Scope creep, integration hell, customer runs out of money, whatever.
+
+JM Kim: The company we are looking at claims a four month average implementation timeline. Their competitors are apparently at eight months or more. Does that sound plausible?
+
+Expert: Four months is... aggressive. Not impossible if they control both the equipment and the software stack, that vertical integration does compress timelines. We were a software-first shop bolting onto third party hardware, and our average was, uh, nine months, I think. If they really are at four months with an integrated stack, that's a genuine moat. But I'd verify it. Ask for the last ten projects with contract signing date and go-live date. Companies always quote their best case as their average.
+
+GS Cho: What should we look at on the SLA side? They claim four hour on-site response nationwide.
+
+Expert: Four hours nationwide is a cost question, not a capability question. Anyone can do it if they staff enough field engineers. The question is utilization. If their field force is under fifty percent utilized, they're burning money to hit that SLA and it will show up in service margins. In the US, best in class is around sixty five percent utilization with a hub and spoke model. Korea is geographically compact so honestly it should be easier there.
+
+JM Kim: On market growth, the company projects roughly doubling revenue next year. The Korean third-party logistics automation market is early. Any benchmark from the US adoption curve?
+
+Expert: So in the US, the inflection came when labor cost crossed, I want to say twenty two, twenty three dollars an hour fully loaded for warehouse labor. Then automation payback dropped under three years and every mid-size operator started buying. My understanding is Korea is right around that threshold now with your minimum wage trajectory, plus you have the demographic problem, nobody wants to work in warehouses. So directionally I buy the growth story. Doubling in one year, that depends on their backlog, not the market. Market growth alone gets you maybe thirty, forty percent.
+
+GS Cho: Any red flags we should probe in diligence?
+
+Expert: Three things. One, revenue recognition on multi-year projects, percentage of completion accounting hides a lot of sins, check unbilled receivables. Two, customer concentration, if the top account is over thirty percent of revenue you have a problem when that account in-sources, and big retailers eventually all try to in-source. Three, the founder dependency thing. In this industry the founder is usually the chief salesman and the chief engineer at the same time. Ask what happens to the pipeline if he's gone.
+
+JM Kim: This has been very helpful. We may follow up with a written question list if that's okay.
+
+Expert: Of course. Good luck with the deal.
+
+[Recording ended 21:47 KST]

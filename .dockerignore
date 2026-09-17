@@ -1,0 +1,48 @@
+# Dockerfile이 `COPY . .`을 하므로 비밀·불필요 파일은 여기서 반드시 제외
+
+# Git
+.git
+.gitignore
+
+# 비밀 (.env.example만 허용)
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+data/token.json
+
+# 런타임 데이터 (Volume으로 마운트)
+data/
+
+# Python
+**/__pycache__
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# 이미지에 필요 없는 것들
+tests/
+scripts/
+*.md
+!README.md
+docker-compose.yml
+railway.json
+
+# 디자인 시스템 미리보기 페이지 (슬라이드 생성에는 web/design/assets, fonts, slides, colors_and_type.css가 필요하므로 preview만 제외)
+web/design/preview
+
+# IDE / OS / 로그
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.log

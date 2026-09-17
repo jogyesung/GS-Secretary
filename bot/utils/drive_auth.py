@@ -1,19 +1,21 @@
-"""Google Drive OAuth 2.0 인증 관리"""
+"""Google OAuth 2.0 인증 관리
 
-import json
+봇 안에서 하는 OOB(urn:ietf:wg:oauth:2.0:oob) 인증 흐름은 Google이 막아서 동작하지 않는다.
+인증은 PC에서 `python auth_local.py`로 하고, 서버에는 GOOGLE_TOKEN_B64로 올린다.
+"""
+
+import asyncio
 import logging
-import os
 from pathlib import Path
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-from bot.config import GOOGLE_CREDENTIALS_FILE, GOOGLE_TOKEN_FILE, GOOGLE_SCOPES
+from bot.config import GOOGLE_TOKEN_FILE, GOOGLE_SCOPES
 
 logger = logging.getLogger(__name__)
 
 
 def get_drive_credentials() -> Credentials | None:
-    """저장된 토큰에서 Google Drive 자격증명을 가져옵니다."""
+    """저장된 토큰에서 Google 자격증명을 가져옵니다 (동기 — 핸들러에서는 async 버전 사용)."""
     creds = None
     token_path = Path(GOOGLE_TOKEN_FILE)
 
@@ -39,36 +41,6 @@ def get_drive_credentials() -> Credentials | None:
     return creds
 
 
-def get_auth_url() -> str | None:
-    """OAuth 인증 URL을 생성합니다."""
-    if not os.path.exists(GOOGLE_CREDENTIALS_FILE):
-        return None
-
-    flow = InstalledAppFlow.from_client_secrets_file(
-        GOOGLE_CREDENTIALS_FILE,
-        scopes=GOOGLE_SCOPES,
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
-    )
-    auth_url, _ = flow.authorization_url(prompt="consent")
-    return auth_url
-
-
-def exchange_code(code: str) -> Credentials | None:
-    """인증 코드를 토큰으로 교환합니다."""
-    if not os.path.exists(GOOGLE_CREDENTIALS_FILE):
-        return None
-
-    flow = InstalledAppFlow.from_client_secrets_file(
-        GOOGLE_CREDENTIALS_FILE,
-        scopes=GOOGLE_SCOPES,
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob",
-    )
-    flow.fetch_token(code=code)
-    creds = flow.credentials
-    _save_token(creds)
-    return creds
-
-
 def _save_token(creds: Credentials):
     """토큰을 파일에 저장합니다."""
     token_path = Path(GOOGLE_TOKEN_FILE)
@@ -78,6 +50,19 @@ def _save_token(creds: Credentials):
 
 
 def is_authenticated() -> bool:
-    """Google Drive 인증 여부 확인"""
+    """Google 인증 여부 확인 (동기 — 토큰 갱신 시 네트워크 호출이 있으니 핸들러에서는 async 버전)"""
     creds = get_drive_credentials()
     return creds is not None and creds.valid
+
+
+async def is_authenticated_async() -> bool:
+    return await asyncio.to_thread(is_authenticated)
+
+
+AUTH_HELP_TEXT = (
+    "🔐 Google 인증은 PC에서 진행해요.\n\n"
+    "1. 프로젝트 폴더에서 `python auth_local.py` 실행 → 브라우저 로그인\n"
+    "2. 생성된 data/token.json을 base64로 인코딩해 Railway 환경변수 GOOGLE_TOKEN_B64에 설정\n"
+    "   (PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes('data/token.json')))\n"
+    "3. 재배포하면 연결돼요."
+)

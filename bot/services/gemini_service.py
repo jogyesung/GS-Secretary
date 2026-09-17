@@ -107,7 +107,7 @@ async def _gemini_regular_search(client: genai.Client, query: str) -> dict | Non
 async def _duckduckgo_search(query: str) -> dict | None:
     """3단계: DuckDuckGo 검색 (라이브러리)"""
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
 
         def _do_search():
             with DDGS() as ddgs:

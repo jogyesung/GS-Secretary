@@ -14,7 +14,7 @@ def _get_service():
     """Gmail API 서비스 객체 생성"""
     creds = get_drive_credentials()
     if not creds or not creds.valid:
-        raise RuntimeError("Google 인증이 필요합니다. /drive_auth 명령을 사용하세요.")
+        raise RuntimeError("Google 인증이 필요합니다. PC에서 auth_local.py로 재인증 후 GOOGLE_TOKEN_B64를 갱신하세요.")
     return build("gmail", "v1", credentials=creds)
 
 
@@ -182,6 +182,49 @@ async def send_email(to: str, subject: str, body: str) -> dict:
         }
 
     return await loop.run_in_executor(None, _send)
+
+
+async def reply_email(message_id: str, body: str) -> dict:
+    """기존 메일에 같은 스레드로 답장 (In-Reply-To/References + threadId)"""
+    loop = asyncio.get_event_loop()
+
+    def _reply():
+        service = _get_service()
+        original = (
+            service.users().messages()
+            .get(userId="me", id=message_id, format="metadata",
+                 metadataHeaders=["Subject", "From", "Reply-To", "Message-ID", "References"])
+            .execute()
+        )
+        headers = original.get("payload", {}).get("headers", [])
+        to = _get_header(headers, "Reply-To") or _get_header(headers, "From")
+        subject = _get_header(headers, "Subject") or ""
+        if not subject.lower().startswith("re:"):
+            subject = f"Re: {subject}"
+        orig_msg_id = _get_header(headers, "Message-ID")
+        references = _get_header(headers, "References")
+
+        message = MIMEText(body, "plain", "utf-8")
+        message["to"] = to
+        message["subject"] = subject
+        if orig_msg_id:
+            message["In-Reply-To"] = orig_msg_id
+            message["References"] = f"{references} {orig_msg_id}".strip()
+
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+        sent = (
+            service.users().messages()
+            .send(userId="me", body={"raw": raw, "threadId": original.get("threadId")})
+            .execute()
+        )
+        return {
+            "id": sent["id"],
+            "thread_id": sent.get("threadId", ""),
+            "to": to,
+            "subject": subject,
+        }
+
+    return await loop.run_in_executor(None, _reply)
 
 
 async def search_emails(query: str, max_results: int = 10) -> list[dict]:

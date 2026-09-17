@@ -1,8 +1,24 @@
-"""리마인더 서비스 - DB CRUD 및 스케줄러 관리"""
+"""리마인더 서비스 - DB CRUD 및 스케줄러 관리 (모든 시각은 KST, naive ISO 문자열로 저장)"""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from bot.database import get_db
+
+KST = timezone(timedelta(hours=9))
+
+
+def now_kst() -> datetime:
+    """KST 현재 시각 (tz 없는 naive datetime — DB 저장 형식과 맞춤)"""
+    return datetime.now(KST).replace(tzinfo=None)
+
+
+def next_daily_run(hour: int, minute: int) -> datetime:
+    """오늘 또는 내일의 HH:MM (KST)"""
+    now = now_kst()
+    run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if run <= now:
+        run += timedelta(days=1)
+    return run
 
 
 def parse_time_string(time_str: str) -> timedelta | None:
@@ -20,13 +36,19 @@ def parse_time_string(time_str: str) -> timedelta | None:
     return None
 
 
+def _iso(dt: datetime) -> str:
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(KST).replace(tzinfo=None)
+    return dt.replace(microsecond=0).isoformat()
+
+
 async def create_reminder(user_id: int, message: str, remind_at: datetime) -> int:
     """일회성 리마인더 생성"""
     db = await get_db()
     try:
         cursor = await db.execute(
             "INSERT INTO reminders (user_id, message, remind_at) VALUES (?, ?, ?)",
-            (user_id, message, remind_at.isoformat()),
+            (user_id, message, _iso(remind_at)),
         )
         await db.commit()
         return cursor.lastrowid
@@ -42,7 +64,7 @@ async def create_recurring_reminder(
     try:
         cursor = await db.execute(
             "INSERT INTO reminders (user_id, message, remind_at, is_recurring, cron_expr) VALUES (?, ?, ?, 1, ?)",
-            (user_id, message, next_run.isoformat(), cron_expr),
+            (user_id, message, _iso(next_run), cron_expr),
         )
         await db.commit()
         return cursor.lastrowid
@@ -88,8 +110,8 @@ async def delete_reminder(user_id: int, reminder_id: int) -> bool:
 
 
 async def get_due_reminders() -> list[dict]:
-    """만료된 리마인더 조회"""
-    now = datetime.now().isoformat()
+    """만료된 리마인더 조회 (KST 기준)"""
+    now = _iso(now_kst())
     db = await get_db()
     try:
         cursor = await db.execute(
@@ -130,7 +152,7 @@ async def update_next_run(reminder_id: int, next_run: datetime):
     try:
         await db.execute(
             "UPDATE reminders SET remind_at = ? WHERE id = ?",
-            (next_run.isoformat(), reminder_id),
+            (_iso(next_run), reminder_id),
         )
         await db.commit()
     finally:

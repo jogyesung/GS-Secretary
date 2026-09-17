@@ -17,12 +17,12 @@ def _css_path() -> str:
 def _asset_path(name: str) -> str:
     return str(ASSETS_DIR / name)
 
+# 생성기(generate_*)가 있는 타입만 노출. TOCSlide/ChartSlide 템플릿 HTML은 web/design/slides에
+# 있지만 아직 생성 함수가 없어 목록에서 뺐다 (도구가 없는 기능을 약속하지 않도록).
 SLIDE_TYPES = {
     "cover": "CoverSlide.html",
-    "toc": "TOCSlide.html",
     "divider": "SectionDivider.html",
     "twocol": "TwoColumn.html",
-    "chart": "ChartSlide.html",
     "closing": "ClosingSlide.html",
 }
 
@@ -41,10 +41,8 @@ def list_slide_types() -> list[dict]:
     result = []
     labels = {
         "cover": "Cover (표지)",
-        "toc": "Table of Contents (목차)",
         "divider": "Section Divider (섹션 구분)",
         "twocol": "Two Column (2단 레이아웃)",
-        "chart": "Chart (차트)",
         "closing": "Closing (종료)",
     }
     for key, filename in SLIDE_TYPES.items():

@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from bot.middleware.auth_middleware import authorized_only
 from bot.services import gemini_service
+from bot.utils.telegram_fmt import reply_html
 
 
 @authorized_only
@@ -19,19 +20,11 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         result = await gemini_service.search(query)
 
-        # 응답 구성
-        text = f"🔍 *검색: {query}*\n\n{result['answer']}"
-
+        text = f"🔍 **검색: {query}**\n\n{result['answer']}"
         if result["sources"]:
-            text += "\n\n📎 *출처:*\n"
-            for src in result["sources"][:5]:
-                text += f"• {src}\n"
+            text += "\n\n📎 **출처:**\n" + "\n".join(f"- {src}" for src in result["sources"][:5])
 
-        # 텔레그램 메시지 길이 제한
-        if len(text) > 4000:
-            text = text[:3997] + "..."
-
-        await update.message.reply_text(text, parse_mode="Markdown", disable_web_page_preview=True)
+        await reply_html(update, text)
 
     except RuntimeError as e:
         await update.message.reply_text(f"❌ {e}")

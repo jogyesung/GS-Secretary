@@ -1,11 +1,11 @@
-"""리마인더 핸들러 - 설정, 조회, 삭제"""
+"""리마인더 핸들러 - 설정, 조회, 삭제 (KST 기준)"""
 
-from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.middleware.auth_middleware import authorized_only
 from bot.services import reminder_service
 from bot.utils.formatting import format_datetime
+from bot.utils.telegram_fmt import reply_html
 
 
 @authorized_only
@@ -15,7 +15,8 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "사용법: /remind <시간> <메시지>\n"
             "시간 형식: 30m(분), 2h(시간), 1d(일)\n"
-            "예: /remind 30m 회의 시작"
+            "예: /remind 30m 회의 시작\n\n"
+            "자연어도 돼요: '내일 9시에 세무사 통화 알려줘'"
         )
         return
 
@@ -27,13 +28,13 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ 시간 형식이 올바르지 않습니다. (예: 30m, 2h, 1d)")
         return
 
-    remind_at = datetime.now() + delta
+    remind_at = reminder_service.now_kst() + delta
     user_id = update.effective_user.id
     reminder_id = await reminder_service.create_reminder(user_id, message, remind_at)
 
     await update.message.reply_text(
         f"⏰ 리마인더 설정 완료! (ID: {reminder_id})\n"
-        f"시간: {format_datetime(remind_at)}\n"
+        f"시간: {format_datetime(remind_at)} KST\n"
         f"내용: {message}"
     )
 
@@ -43,8 +44,8 @@ async def remind_daily_command(update: Update, context: ContextTypes.DEFAULT_TYP
     """매일 반복 리마인더 (예: /remind_daily 09:00 출근 체크)"""
     if len(context.args) < 2:
         await update.message.reply_text(
-            "사용법: /remind\\_daily <HH:MM> <메시지>\n"
-            "예: /remind\\_daily 09:00 출근 체크"
+            "사용법: /remind_daily <HH:MM> <메시지>\n"
+            "예: /remind_daily 09:00 출근 체크"
         )
         return
 
@@ -59,22 +60,14 @@ async def remind_daily_command(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("❌ 시간 형식이 올바르지 않습니다. (예: 09:00, 14:30)")
         return
 
-    # 다음 실행 시간 계산
-    now = datetime.now()
-    next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if next_run <= now:
-        from datetime import timedelta
-        next_run += timedelta(days=1)
-
+    next_run = reminder_service.next_daily_run(hour, minute)
     cron_expr = f"{minute} {hour} * * *"
     user_id = update.effective_user.id
-    reminder_id = await reminder_service.create_recurring_reminder(
-        user_id, message, cron_expr, next_run
-    )
+    reminder_id = await reminder_service.create_recurring_reminder(user_id, message, cron_expr, next_run)
 
     await update.message.reply_text(
         f"🔄 매일 반복 리마인더 설정 완료! (ID: {reminder_id})\n"
-        f"시간: 매일 {time_str}\n"
+        f"시간: 매일 {hour:02d}:{minute:02d} KST\n"
         f"내용: {message}"
     )
 
@@ -89,20 +82,25 @@ async def reminders_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⏰ 활성 리마인더가 없습니다.")
         return
 
-    lines = ["⏰ *리마인더 목록*\n"]
+    lines = ["⏰ **리마인더 목록**", ""]
     for r in reminders:
-        type_icon = "🔄" if r["is_recurring"] else "⏳"
-        time_str = r["remind_at"][:16] if not r["is_recurring"] else f"매일 (cron: {r['cron_expr']})"
-        lines.append(f"{type_icon} **#{r['id']}** | {time_str}\n{r['message']}\n")
+        if r["is_recurring"]:
+            minute, hour = r["cron_expr"].split()[:2]
+            time_str = f"매일 {int(hour):02d}:{int(minute):02d}"
+            icon = "🔄"
+        else:
+            time_str = r["remind_at"][:16].replace("T", " ")
+            icon = "⏳"
+        lines.append(f"{icon} **#{r['id']}** | {time_str}\n{r['message']}\n")
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await reply_html(update, "\n".join(lines))
 
 
 @authorized_only
 async def remind_del_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """리마인더 삭제"""
     if not context.args:
-        await update.message.reply_text("사용법: /remind\\_del <리마인더ID>")
+        await update.message.reply_text("사용법: /remind_del <리마인더ID>")
         return
 
     try:

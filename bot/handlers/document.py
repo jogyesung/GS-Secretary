@@ -1,5 +1,6 @@
-"""문서 분석 핸들러 - PDF/DOCX/XLSX/텍스트 파일을 Claude로 분석"""
+"""문서 분석 핸들러 - PDF/DOCX/XLSX/텍스트 파일을 Claude로 분석 (대화 히스토리에 포함 → 후속 질문 가능)"""
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -8,6 +9,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.config import TEMP_DOWNLOAD_PATH
+from bot.middleware.auth_middleware import authorized_only
+from bot.services import claude_service
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +21,17 @@ SUPPORTED_EXTENSIONS = {
     ".pdf", ".docx", ".xlsx", ".txt", ".md", ".csv", ".json", ".py", ".log",
 }
 
+_DOC_GUIDE = (
+    "\n\n(문서 분석 지침: 계약서면 핵심 조건(금액, 기간, 의무사항), 보고서면 주요 결론과 수치, "
+    "표 데이터면 핵심 트렌드를 정리. 답변에 이 지침을 언급하지 마세요.)"
+)
+
 
 def is_analyzable(filename: str) -> bool:
     return Path(filename or "").suffix.lower() in SUPPORTED_EXTENSIONS
 
 
+@authorized_only
 async def analyze_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """첨부 문서를 다운로드해 텍스트를 추출하고 카리나가 분석"""
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -30,6 +39,7 @@ async def analyze_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     user_id = update.effective_user.id
     caption = update.message.caption or "이 문서를 요약해주세요."
+    safe_name = Path(doc.file_name or "file").name or "file"
 
     if doc.file_size and doc.file_size > MAX_FILE_SIZE:
         await update.message.reply_text("😥 파일이 너무 커요 (20MB 이하만 분석 가능해요)")
@@ -39,10 +49,11 @@ async def analyze_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         TEMP_DOWNLOAD_PATH.mkdir(parents=True, exist_ok=True)
         file = await doc.get_file()
-        temp_path = TEMP_DOWNLOAD_PATH / f"doc_{update.message.message_id}_{doc.file_name}"
+        temp_path = TEMP_DOWNLOAD_PATH / f"doc_{update.message.message_id}_{safe_name}"
         await file.download_to_drive(str(temp_path))
 
-        text = _extract_text(temp_path)
+        # PDF/DOCX 파싱은 CPU 작업 → 스레드에서 (이벤트 루프 안 막음)
+        text = await asyncio.to_thread(_extract_text, temp_path)
         if not text or not text.strip():
             await update.message.reply_text(
                 "😥 문서에서 텍스트를 추출하지 못했어요. 스캔 이미지 PDF라면 사진으로 보내주시면 분석해드릴게요!"
@@ -52,17 +63,17 @@ async def analyze_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         truncated = len(text) > MAX_CHARS
         if truncated:
             text = text[:MAX_CHARS]
+        note = "\n(참고: 문서가 길어 앞부분만 발췌됨)" if truncated else ""
 
-        response = await _analyze_with_claude(user_id, doc.file_name, text, caption, truncated)
+        # 문서 본문을 대화 턴에 포함 → "여기서 EBITDA 얼마야?" 같은 후속 질문 가능 (캐시로 재전송 비용 0.1x)
+        message = f"[파일명: {safe_name}]{note}\n\n{text}\n\n---\n요청: {caption}{_DOC_GUIDE}"
+        response = await claude_service.chat(user_id, message, heavy=True)
 
-        if len(response) > 4000:
-            for i in range(0, len(response), 4000):
-                await update.message.reply_text(response[i:i + 4000])
-        else:
-            await update.message.reply_text(response)
+        from bot.handlers.chat import respond
+        await respond(update, context, response)
 
     except Exception as e:
-        logger.error(f"문서 분석 실패: {e}")
+        logger.exception("문서 분석 실패")
         await update.message.reply_text(f"❌ 문서 분석 중 오류가 발생했어요: {e}")
     finally:
         if temp_path is not None:
@@ -74,7 +85,7 @@ async def analyze_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def _extract_text(path: Path) -> str | None:
-    """파일 형식별 텍스트 추출"""
+    """파일 형식별 텍스트 추출 (동기 — to_thread로 호출)"""
     ext = path.suffix.lower()
 
     if ext == ".pdf":
@@ -97,45 +108,11 @@ def _extract_text(path: Path) -> str | None:
         parts = []
         for sheet in wb.worksheets:
             parts.append(f"[시트: {sheet.title}]")
-            for row in sheet.iter_rows(max_rows=200, values_only=True):
+            for row in sheet.iter_rows(max_row=200, values_only=True):
                 cells = [str(c) for c in row if c is not None]
                 if cells:
                     parts.append(" | ".join(cells))
         wb.close()
         return "\n".join(parts)
 
-    # 텍스트 계열 (.txt, .md, .csv, .json, .py, .log)
     return path.read_text(encoding="utf-8", errors="replace")
-
-
-async def _analyze_with_claude(user_id: int, filename: str, text: str, prompt: str, truncated: bool) -> str:
-    """추출된 텍스트를 Sonnet으로 분석 (히스토리와 분리된 단발 호출)"""
-    from bot.services.claude_service import _get_client, SONNET_MODEL, _log_api_usage
-    from bot.config import CLAUDE_SYSTEM_PROMPT, CLAUDE_MAX_TOKENS
-
-    client = _get_client()
-
-    system_text = (
-        CLAUDE_SYSTEM_PROMPT
-        + "\n\n[문서 분석 지침]"
-        "\n사용자가 보낸 문서의 내용을 분석합니다."
-        "\n계약서면 핵심 조건(금액, 기간, 의무사항)을 정리해주세요."
-        "\n보고서면 주요 결론과 수치를 요약해주세요."
-        "\n표 데이터면 핵심 트렌드를 짚어주세요."
-    )
-
-    note = "\n(참고: 문서가 길어 앞부분만 발췌됨)" if truncated else ""
-    user_content = f"[파일명: {filename}]{note}\n\n{text}\n\n---\n요청: {prompt}"
-
-    response = await client.messages.create(
-        model=SONNET_MODEL,
-        max_tokens=CLAUDE_MAX_TOKENS,
-        system=[{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user_content}],
-    )
-
-    if hasattr(response, "usage"):
-        await _log_api_usage(user_id, response.usage.input_tokens, response.usage.output_tokens, 0, SONNET_MODEL)
-
-    text_parts = [block.text for block in response.content if hasattr(block, "text") and block.text]
-    return "\n".join(text_parts) if text_parts else "문서를 분석할 수 없었어요."

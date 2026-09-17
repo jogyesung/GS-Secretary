@@ -26,7 +26,7 @@ def _get_service():
     """Google Calendar API 서비스 객체 생성"""
     creds = get_drive_credentials()
     if not creds or not creds.valid:
-        raise RuntimeError("Google 인증이 필요합니다. /drive_auth 명령을 사용하세요.")
+        raise RuntimeError("Google 인증이 필요합니다. PC에서 auth_local.py로 재인증 후 GOOGLE_TOKEN_B64를 갱신하세요.")
     return build("calendar", "v3", credentials=creds)
 
 
@@ -94,6 +94,7 @@ async def list_events(days: int = 1, max_results: int = 20) -> list[dict]:
                         "location": event.get("location", ""),
                         "description": event.get("description", ""),
                         "status": event.get("status", ""),
+                        "attendees": [a.get("email", "") for a in event.get("attendees", [])],
                     })
             except Exception:
                 continue

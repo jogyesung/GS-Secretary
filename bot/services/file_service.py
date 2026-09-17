@@ -1,6 +1,7 @@
 """로컬 PC 파일 관리 서비스"""
 
 import os
+import re
 import shutil
 from pathlib import Path
 from bot.config import ALLOWED_PATHS
@@ -55,14 +56,27 @@ def get_file_path(file_path: str) -> Path:
     return path
 
 
+def safe_filename(filename: str | None, default: str = "file") -> str:
+    """텔레그램/Drive에서 온 파일명에서 디렉토리 성분 제거 (..\\ 같은 traversal 방지)"""
+    # Windows 클라이언트가 보낸 '..\\..\\x' 도 리눅스 서버에서 잘라내야 하므로 양쪽 구분자 모두 처리
+    name = re.split(r"[\\/]", str(filename or ""))[-1].strip()
+    name = name.replace("\x00", "")
+    if name in ("", ".", ".."):
+        return default
+    return name
+
+
 def save_file(dest_dir: str, filename: str, content: bytes) -> str:
-    """파일을 로컬에 저장"""
+    """파일을 로컬에 저장 (디렉토리와 최종 경로 모두 허용 범위 검증)"""
     dir_path = Path(dest_dir)
     if not _is_path_allowed(dir_path):
         raise PermissionError(f"접근이 허용되지 않은 경로입니다: {dest_dir}")
 
+    file_path = dir_path / safe_filename(filename)
+    if not _is_path_allowed(file_path):
+        raise PermissionError(f"접근이 허용되지 않은 경로입니다: {file_path}")
+
     dir_path.mkdir(parents=True, exist_ok=True)
-    file_path = dir_path / filename
     file_path.write_bytes(content)
     return str(file_path)
 

@@ -23,11 +23,16 @@ _TEXT_MIME_TYPES = {
 }
 
 
+def _escape_q(text: str) -> str:
+    """Drive 검색 쿼리 문자열 리터럴 escape (작은따옴표/백슬래시 → API 400 방지)"""
+    return (text or "").replace("\\", "\\\\").replace("'", "\\'")
+
+
 def _get_service():
     """Google Drive API 서비스 객체 생성"""
     creds = get_drive_credentials()
     if not creds or not creds.valid:
-        raise RuntimeError("Google Drive 인증이 필요합니다. /drive_auth 명령을 사용하세요.")
+        raise RuntimeError("Google 인증이 필요합니다. PC에서 auth_local.py로 재인증 후 GOOGLE_TOKEN_B64를 갱신하세요.")
     return build("drive", "v3", credentials=creds)
 
 
@@ -59,7 +64,7 @@ async def search_files(query_text: str, page_size: int = 20) -> list[dict]:
 
     def _search():
         service = _get_service()
-        query = f"name contains '{query_text}' and trashed = false"
+        query = f"name contains '{_escape_q(query_text)}' and trashed = false"
         results = (
             service.files()
             .list(
@@ -345,7 +350,7 @@ async def fulltext_search(query_text: str, page_size: int = 10) -> list[dict]:
 
     def _search():
         service = _get_service()
-        query = f"fullText contains '{query_text}' and trashed = false"
+        query = f"fullText contains '{_escape_q(query_text)}' and trashed = false"
         results = (
             service.files()
             .list(

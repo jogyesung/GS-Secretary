@@ -36,6 +36,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -70,6 +71,14 @@ TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 REPORTS_DIR = Path(BASE_DIR) / "data" / "stock_reports"
 
 
+# 스크랩한 뉴스 제목이 프롬프트에 그대로 들어가므로(프롬프트 인젝션 가능) 에이전트가 파일을 읽지 못하게 격리:
+# 빈 임시 폴더에서 실행 + 도구 비활성. 구버전 CLI가 옵션을 모르면 다음 후보로 재시도.
+_TOOL_DISABLE_OPTIONS = [
+    ["--tools", ""],
+    ["--disallowedTools", "Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Agent"],
+]
+
+
 def run_claude_cli(prompt: str) -> str | None:
     """Claude Code CLI 헤드리스 호출 (구독 로그인 사용, API 과금 없음)"""
     claude = shutil.which("claude")
@@ -78,22 +87,35 @@ def run_claude_cli(prompt: str) -> str | None:
             "claude CLI를 찾지 못했어요. 설치: npm install -g @anthropic-ai/claude-code"
         )
         return None
+
+    sandbox = tempfile.mkdtemp(prefix="gs_stock_report_")
     try:
-        proc = subprocess.run(
-            [claude, "-p", "--output-format", "text"],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=CLAUDE_TIMEOUT_SEC,
-        )
-    except subprocess.TimeoutExpired:
-        logger.error("claude CLI 응답 시간 초과")
+        for extra in _TOOL_DISABLE_OPTIONS:
+            try:
+                proc = subprocess.run(
+                    [claude, "-p", "--output-format", "text", *extra],
+                    input=prompt,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=CLAUDE_TIMEOUT_SEC,
+                    cwd=sandbox,
+                )
+            except subprocess.TimeoutExpired:
+                logger.error("claude CLI 응답 시간 초과")
+                return None
+            if proc.returncode == 0:
+                return (proc.stdout or "").strip() or None
+            stderr = (proc.stderr or "")[:300]
+            if "unknown option" in stderr.lower() or "unknown argument" in stderr.lower():
+                logger.info(f"claude CLI가 {extra[0]} 옵션을 지원하지 않아 다른 옵션으로 재시도")
+                continue
+            logger.error(f"claude CLI 실패 (code {proc.returncode}): {stderr}")
+            return None
+        logger.error("claude CLI 도구 비활성 옵션을 모두 인식하지 못해 검토를 건너뜁니다")
         return None
-    if proc.returncode != 0:
-        logger.error(f"claude CLI 실패 (code {proc.returncode}): {(proc.stderr or '')[:300]}")
-        return None
-    return (proc.stdout or "").strip() or None
+    finally:
+        shutil.rmtree(sandbox, ignore_errors=True)
 
 
 def build_report(collected: list[dict]) -> str:

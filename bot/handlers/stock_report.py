@@ -7,37 +7,10 @@ from telegram.ext import ContextTypes
 from bot.config import ALLOWED_USER_IDS
 from bot.middleware.auth_middleware import authorized_only
 from bot.services import stock_research_service
+from bot.utils.jobs import job_guard
+from bot.utils.telegram_fmt import send_html
 
 logger = logging.getLogger(__name__)
-
-# 텔레그램 메시지 한도(4096자) 이내로 분할
-MAX_CHUNK = 3500
-
-
-def _split_chunks(text: str, size: int = MAX_CHUNK) -> list[str]:
-    """긴 메시지를 줄바꿈 경계에서 분할"""
-    chunks = []
-    while len(text) > size:
-        cut = text.rfind("\n", 0, size)
-        if cut <= 0:
-            cut = size
-        chunks.append(text[:cut])
-        text = text[cut:].lstrip("\n")
-    if text:
-        chunks.append(text)
-    return chunks
-
-
-async def _send_report(bot, chat_id: int, text: str):
-    """리포트 전송 (Markdown 파싱 실패 시 일반 텍스트로 재시도)"""
-    for chunk in _split_chunks(text):
-        try:
-            await bot.send_message(
-                chat_id=chat_id, text=chunk,
-                parse_mode="Markdown", disable_web_page_preview=True,
-            )
-        except Exception:
-            await bot.send_message(chat_id=chat_id, text=chunk, disable_web_page_preview=True)
 
 
 async def _build_report_text() -> str:
@@ -67,17 +40,14 @@ async def _build_report_text() -> str:
     return text
 
 
+@job_guard("morning_stock_report")
 async def morning_stock_report(context: ContextTypes.DEFAULT_TYPE):
     """평일 아침 종목 리포트 브리핑 (자동 스케줄)"""
-    try:
-        text = await _build_report_text()
-    except Exception as e:
-        logger.error(f"아침 종목 리포트 생성 실패: {e}")
-        return
+    text = await _build_report_text()
 
     for user_id in ALLOWED_USER_IDS:
         try:
-            await _send_report(context.bot, user_id, text)
+            await send_html(context.bot, user_id, text)
             logger.info(f"아침 종목 리포트 발송 완료: {user_id}")
         except Exception as e:
             logger.error(f"아침 종목 리포트 발송 실패 ({user_id}): {e}")
@@ -99,4 +69,4 @@ async def stock_report_command(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("😥 리포트/뉴스 수집에 실패했어요. 잠시 후 다시 시도해주세요.")
         return
 
-    await _send_report(context.bot, update.effective_chat.id, text)
+    await send_html(context.bot, update.effective_chat.id, text)

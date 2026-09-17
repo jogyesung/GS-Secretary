@@ -1,147 +1,47 @@
-"""Claude AI 대화 핸들러 - 3단계 스마트 라우팅: Gemini → Haiku → Sonnet"""
+"""Claude AI 대화 핸들러 - 도구는 항상 켜고, 모델만 작업 무게로 고른다 (Haiku 기본 / Sonnet 무거운 작업)
 
-import os
-import re
+이전 3단계 라우팅(Gemini → Haiku 도구 없음 → Sonnet)은 후속 질문("그럼 화요일로 바꿔줘")이
+도구 없는 Haiku로 빠져 동작하지 않는 문제가 있었다. 지금은 모든 메시지가 도구를 쓸 수 있고,
+Gemini는 web_search 도구와 /search 뒤에서만 쓴다.
+"""
+
 import logging
-from telegram import Update
+import os
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+
 from bot.middleware.auth_middleware import authorized_only
 from bot.services import claude_service
-from bot.config import GEMINI_API_KEY
+from bot.utils.telegram_fmt import reply_html, send_html
 
 logger = logging.getLogger(__name__)
 
-# 도구가 필요한 키워드 → Sonnet (도구 호출 품질이 중요)
-_TOOL_KEYWORDS = [
-    # Drive / 문서 검색 관련
+# Sonnet(무거운 모델)이 필요한 작업 — 도구 호출 품질·긴 글 품질이 중요한 경우
+_HEAVY_KEYWORDS = [
+    # Drive/Gmail 병렬 검색·문서 읽기 (여러 도구 조합)
     "드라이브", "drive", "구글 파일", "구글파일",
-    "읽어", "열어", "찾아줘", "검색해줘", "보내줘", "다운로드",
-    "문서", "보고서", "자료", "파일", "계약서", "offer",
-    "엑셀", "워드", "pdf", "첨부",
-    # Calendar 관련
-    "일정", "캘린더", "스케줄", "회의", "미팅", "약속", "잡아", "등록",
-    # Gmail 관련
+    "찾아줘", "검색해줘", "보내줘", "다운로드",
+    "문서", "보고서", "자료", "계약서", "offer", "첨부",
+    "엑셀", "워드", "pdf",
     "이메일", "메일", "받은편지함", "gmail",
-    # 메모 관련
-    "메모",
-    # PC 파일 관련
-    "pc 파일", "pc파일", "로컬 파일", "로컬파일",
+    "일정", "캘린더", "스케줄", "회의", "미팅", "약속",
     # 슬라이드/PPT
     "슬라이드", "slide", "ppt", "프레젠테이션", "덱",
-    # 웹 검색 (도구) — 실시간 데이터가 필요한 키워드 포함
-    "검색해", "찾아봐", "알아봐",
-    "코스피", "코스닥", "주가", "환율", "시세", "주식",
-    "날씨", "뉴스", "실시간", "오늘 ",
-]
-
-# Gemini로 처리할 수 있는 패턴 (무료, 가장 저렴)
-_GEMINI_PATTERNS = [
-    r"(뭐|무엇|어떤|어디|누구|언제|왜|몇|얼마).*(야|이야|인가|인지|일까|인데|이지)",
-    r".*(알려줘|알려주세요|뭐야|뭐지|뭐냐)",
-    r".*(날씨|뉴스|주가|환율|시세|가격)",
-    r".*(뜻|의미|차이).*",
-    r"(추천|좋은|괜찮은|맛집|식당|카페).*",
-    r"^.{0,50}$",  # 50자 이하 짧은 메시지
+    # 긴 글 생성·분석
+    "작성해", "써줘", "초안", "정리해줘", "요약해", "분석해", "검토해", "번역", "비교해",
 ]
 
 
-def _needs_tools(message: str) -> bool:
-    """도구 호출이 필요한 메시지인지 판단 → Sonnet 사용"""
+def needs_heavy_model(message: str) -> bool:
+    """Sonnet이 필요한 메시지인지 판단. 나머지는 Haiku + 도구."""
     msg_lower = message.lower()
-    for kw in _TOOL_KEYWORDS:
-        if kw in msg_lower:
-            return True
-    return False
-
-
-def _can_use_gemini(message: str) -> bool:
-    """Gemini로 처리 가능한 간단한 질문인지 판단"""
-    for pattern in _GEMINI_PATTERNS:
-        if re.search(pattern, message):
-            return True
-    return False
-
-
-async def _gemini_chat(query: str) -> str:
-    """Gemini로 간단한 질문에 답변"""
-    from bot.services.gemini_service import _get_client, _gemini_grounding_search, _gemini_regular_search
-    from bot.services.gemini_service import needs_web_search
-
-    client = _get_client()
-
-    if needs_web_search(query):
-        result = await _gemini_grounding_search(client, query)
-        if result:
-            return result["answer"]
-
-    result = await _gemini_regular_search(client, query)
-    if result:
-        answer = result["answer"]
-        if answer.startswith("[Gemini 일반 검색]\n"):
-            answer = answer[len("[Gemini 일반 검색]\n"):]
-        return answer
-
-    return None
-
-
-async def _send_response(update: Update, text: str):
-    """긴 응답을 분할 전송"""
-    if len(text) > 4000:
-        for i in range(0, len(text), 4000):
-            await update.message.reply_text(text[i:i + 4000])
-    else:
-        await update.message.reply_text(text)
-
-
-@authorized_only
-async def handle_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """3단계 스마트 라우팅: Gemini(무료) → Haiku(저가) → Sonnet(도구용)"""
-    message = update.message.text or ""
-    user_id = update.effective_user.id
-
-    if not message.strip():
-        return
-
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-
-    try:
-        has_history = claude_service.get_history_length(user_id) > 0
-        needs_tool = _needs_tools(message)
-
-        # === 1단계: 도구가 필요하면 Sonnet (히스토리 있어도 도구 키워드면 Sonnet) ===
-        if needs_tool:
-            logger.info(f"[Sonnet+도구] {message[:50]}")
-            response = await claude_service.chat(user_id, message, use_tools=True)
-            await _send_response(update, response)
-            await _send_pending_files(update, context, user_id)
-            return
-
-        # === 2단계: 히스토리 없고 Gemini 가능하면 Gemini (무료) ===
-        if not has_history and GEMINI_API_KEY and _can_use_gemini(message):
-            logger.info(f"[Gemini] {message[:50]}")
-            try:
-                gemini_response = await _gemini_chat(message)
-                if gemini_response:
-                    await _send_response(update, gemini_response)
-                    return
-            except Exception as e:
-                logger.warning(f"Gemini 실패, Haiku 폴백: {e}")
-
-        # === 3단계: 나머지는 Haiku (도구 없이 가볍게) ===
-        logger.info(f"[Haiku] {message[:50]}")
-        response = await claude_service.chat(user_id, message, use_tools=False)
-        await _send_response(update, response)
-
-    except RuntimeError as e:
-        await update.message.reply_text(f"❌ {e}")
-    except Exception as e:
-        await update.message.reply_text(f"❌ 응답 오류: {e}")
+    return any(kw in msg_lower for kw in _HEAVY_KEYWORDS)
 
 
 async def _send_pending_files(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
     """대기 중인 파일 전송"""
-    pending_files = claude_service.get_pending_files(user_id)
-    for file_path in pending_files:
+    for file_path in claude_service.get_pending_files(user_id):
         try:
             with open(file_path, "rb") as f:
                 await context.bot.send_document(
@@ -150,12 +50,86 @@ async def _send_pending_files(update: Update, context: ContextTypes.DEFAULT_TYPE
                     filename=os.path.basename(file_path),
                 )
         except Exception as e:
-            await update.message.reply_text(f"❌ 파일 전송 실패: {e}")
+            await update.effective_message.reply_text(f"❌ 파일 전송 실패: {e}")
         finally:
             try:
                 os.remove(file_path)
             except OSError:
                 pass
+
+
+async def _send_pending_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """확인이 필요한 작업이 있으면 버튼 표시"""
+    action = claude_service.get_pending_action(user_id)
+    if not action:
+        return
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ 실행", callback_data=f"act:ok:{action['token']}"),
+        InlineKeyboardButton("❌ 취소", callback_data=f"act:no:{action['token']}"),
+    ]])
+    await send_html(
+        context.bot, update.effective_chat.id,
+        "**실행 전 확인이 필요해요**\n\n" + action["summary"],
+        reply_markup=keyboard,
+    )
+
+
+async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """카리나 답변 + 대기 파일 + 확인 버튼을 한 번에 처리"""
+    user_id = update.effective_user.id
+    await reply_html(update, text)
+    await _send_pending_files(update, context, user_id)
+    await _send_pending_confirmation(update, context, user_id)
+
+
+async def handle_text_query(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    """텍스트/음성 공용 진입점"""
+    user_id = update.effective_user.id
+    heavy = needs_heavy_model(text)
+    logger.info(f"[{'Sonnet' if heavy else 'Haiku'}+도구] {text[:50]}")
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    response = await claude_service.chat(user_id, text, heavy=heavy)
+    await respond(update, context, response)
+
+
+@authorized_only
+async def handle_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """일반 텍스트 메시지 → 카리나"""
+    message = update.message.text or ""
+    if not message.strip():
+        return
+    try:
+        await handle_text_query(update, context, message)
+    except RuntimeError as e:
+        await update.message.reply_text(f"❌ {e}")
+    except Exception as e:
+        logger.exception("채팅 처리 실패")
+        await update.message.reply_text(f"❌ 응답 오류: {e}")
+
+
+@authorized_only
+async def action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """위험 작업 확인/취소 버튼"""
+    query = update.callback_query
+    await query.answer()
+    _, decision, token = query.data.split(":", 2)
+    user_id = update.effective_user.id
+
+    action = claude_service.pop_pending_action(user_id, token)
+    if not action:
+        await query.edit_message_text("⌛ 이미 처리됐거나 만료된 요청이에요. 다시 요청해주세요.")
+        return
+
+    if decision != "ok":
+        await query.edit_message_text("❌ 취소했어요.")
+        return
+
+    try:
+        result = await claude_service.execute_confirmed_action(user_id, action)
+        await query.edit_message_text(f"✅ 실행 완료\n\n{result[:3500]}")
+    except Exception as e:
+        logger.exception("확인 작업 실행 실패")
+        await query.edit_message_text(f"❌ 실행 실패: {e}")
 
 
 @authorized_only

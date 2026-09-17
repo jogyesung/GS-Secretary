@@ -51,12 +51,22 @@ ALLOWED_PATHS = [
     if p.strip()
 ]
 
-# 데이터베이스
+# 데이터베이스 (Railway는 Volume을 /data에 마운트하고 DATABASE_PATH=/data/gs_secretary.db 권장)
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "data" / "gs_secretary.db"))
+# Railway가 볼륨을 마운트하면 이 환경변수를 넣어줌. 없으면 재배포 시 DB가 사라짐.
+RAILWAY_VOLUME_MOUNT_PATH = os.getenv("RAILWAY_VOLUME_MOUNT_PATH", "")
+IS_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_PROJECT_ID"))
+
+# DB 야간 백업을 올릴 Google Drive 폴더명 (빈 값이면 백업 안 함)
+DB_BACKUP_DRIVE_FOLDER = os.getenv("DB_BACKUP_DRIVE_FOLDER", "GS-Secretary 백업")
 
 # Claude API
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
+CLAUDE_LIGHT_MODEL = os.getenv("CLAUDE_LIGHT_MODEL", "claude-haiku-4-5")
+# Sonnet 5는 adaptive thinking이 기본이라 채팅은 낮은 effort로 (low/medium/high)
+CLAUDE_EFFORT = os.getenv("CLAUDE_EFFORT", "low")
+CLAUDE_HEAVY_EFFORT = os.getenv("CLAUDE_HEAVY_EFFORT", "medium")
 CLAUDE_SYSTEM_PROMPT = os.getenv(
     "CLAUDE_SYSTEM_PROMPT",
     "당신의 이름은 '카리나'이고, GS Secretary 텔레그램 업무 비서예요.\n\n"
@@ -73,7 +83,8 @@ CLAUDE_SYSTEM_PROMPT = os.getenv(
     "업무 관련 질문, 문서 작성, 요약, 번역, 아이디어 정리, "
     "Google Drive/Calendar/Gmail 연동, 슬라이드 생성 등을 도와줘요."
 )
-CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "4096"))
+# thinking 토큰도 max_tokens에 포함되므로 여유 있게
+CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "8192"))
 
 # Gemini API (실시간 웹 검색용)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -108,6 +119,19 @@ STOCK_REPORT_MODE = os.getenv("STOCK_REPORT_MODE", "off").lower()
 
 # 일일 API 비용 한도 (USD) - 초과 시 텔레그램 알림
 DAILY_COST_LIMIT_USD = float(os.getenv("DAILY_COST_LIMIT_USD", "1.0"))
+
+# 조용시간 (KST, 이 시간대에는 긴급 등급이 아닌 알림을 보류했다가 아침에 묶어서 발송)
+QUIET_HOURS_START = int(os.getenv("QUIET_HOURS_START", "22"))
+QUIET_HOURS_END = int(os.getenv("QUIET_HOURS_END", "7"))
+
+# DART 다이제스트(정기보고서 등 낮은 등급 공시 묶음) 발송 시각 (KST, HH:MM)
+DART_DIGEST_TIME = os.getenv("DART_DIGEST_TIME", "08:00")
+
+# 포트폴리오 가격 변동 알림 임계값 (%, 국내 종목, 장중 15분 주기 체크). 0이면 끔
+PRICE_ALERT_THRESHOLD_PCT = float(os.getenv("PRICE_ALERT_THRESHOLD_PCT", "3.0"))
+
+# 미팅 준비 브리핑: 참석자/설명이 있는 일정 N분 전에 관련 메일·문서·메모 요약 발송. 0이면 끔
+MEETING_PREP_MINUTES = int(os.getenv("MEETING_PREP_MINUTES", "30"))
 
 # 실행 모드: cloud (Drive+메모+리마인더), local (PC파일만), all (전부)
 RUN_MODE = os.getenv("RUN_MODE", "all").lower()

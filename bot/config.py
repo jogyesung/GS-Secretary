@@ -81,7 +81,7 @@ CLAUDE_SYSTEM_PROMPT = os.getenv(
     "- 절대 '~습니다', '~합니다' 같은 딱딱한 존댓말을 쓰지 마세요. 항상 '~요' 체로!\n\n"
     "[역할]\n"
     "업무 관련 질문, 문서 작성, 요약, 번역, 아이디어 정리, "
-    "Google Drive/Calendar/Gmail 연동, 슬라이드 생성 등을 도와줘요."
+    "Google Drive/Calendar/Gmail 연동 등을 도와줘요."
 )
 # thinking 토큰도 max_tokens에 포함되므로 여유 있게
 CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "8192"))

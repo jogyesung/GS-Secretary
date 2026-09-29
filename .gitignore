@@ -24,9 +24,6 @@ data/*.db
 # Temp files
 data/temp/
 
-# Generated slides
-data/slides/
-
 # Generated stock reports
 data/stock_reports/
 

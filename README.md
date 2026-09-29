@@ -9,7 +9,6 @@
 - 🎤 음성, 🖼 사진, 📄 PDF/워드/엑셀을 보내면 분석하고, 대화에 남아서 "여기서 EBITDA 얼마야?"처럼 이어 물을 수 있어요.
 - "내일 9시에 세무사 통화 알려줘" → 리마인더, "삼성전자 최근 공시 뭐야?" → DART 조회, "오늘 코스피 어때?" → 실시간 검색.
 - 📧 메일 발송(새 메일·답장)과 🗑 일정 삭제는 실행 전에 확인 버튼이 떠요.
-- CIP 브랜드 슬라이드(표지·2단·섹션 구분·종료)를 PNG로 만들어 보내요.
 
 **브리핑·알림**
 - 매일 07:00: 오늘 일정 + 먼저 볼 메일 5건(긴급도 정리) + 리마인더, 이어서 이번 주 증시 이벤트(실적발표·물가지수·중앙은행).
@@ -20,7 +19,7 @@
 - 운영: 봇 오류·스케줄 잡 실패·재시작 시 관리자 DM, 일일 API 비용 한도 알림, 매일 03:00 DB를 Drive에 백업, 22~07시는 긴급 아닌 알림 보류.
 
 **모델 라우팅**
-기본은 Haiku 4.5 + 도구, 문서 검색·작성·슬라이드처럼 무거운 작업은 Sonnet 5. Gemini는 웹 검색·음성 인식·증시 브리핑 검색에 써요. 시스템 프롬프트·도구·대화 히스토리에 프롬프트 캐싱을 걸어 비용을 줄이고, `/usage`에서 모델별 비용과 캐시 히트율을 볼 수 있어요.
+기본은 Haiku 4.5 + 도구, 문서 검색·작성처럼 무거운 작업은 Sonnet 5. Gemini는 웹 검색·음성 인식·증시 브리핑 검색에 써요. 시스템 프롬프트·도구·대화 히스토리에 프롬프트 캐싱을 걸어 비용을 줄이고, `/usage`에서 모델별 비용과 캐시 히트율을 볼 수 있어요.
 
 ## 빠른 시작 (로컬)
 
@@ -29,7 +28,6 @@ git clone https://github.com/jogyesung/GS-Secretary.git
 cd GS-Secretary
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-playwright install chromium        # 슬라이드 PNG (선택, 없으면 HTML로 전송)
 cp .env.example .env               # 값 채우기
 python auth_local.py               # Google 인증 (브라우저) → data/token.json
 python -m bot.main
@@ -39,7 +37,7 @@ Python 3.11+. 필요한 키: Telegram 봇 토큰, Anthropic, Gemini(검색·음�
 
 ## Railway 배포
 
-Dockerfile로 빌드돼요 (Chromium 포함). 반드시 할 것:
+Dockerfile로 빌드돼요. 반드시 할 것:
 
 1. **Volume을 `/data`에 마운트**하고 환경변수에 `DATABASE_PATH=/data/gs_secretary.db`, `GOOGLE_TOKEN_FILE=/data/token.json` 설정. 없으면 재배포할 때마다 메모·리마인더·포트폴리오·사용량이 사라져요 (`/status`에서 "저장소" 항목으로 확인).
 2. Google 인증은 PC에서 `python auth_local.py`로 하고, `credentials.json`과 `data/token.json`을 base64로 인코딩해 `GOOGLE_CREDENTIALS_B64`, `GOOGLE_TOKEN_B64`에 넣어요.

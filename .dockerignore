@@ -35,9 +35,6 @@ scripts/
 docker-compose.yml
 railway.json
 
-# 디자인 시스템 미리보기 페이지 (슬라이드 생성에는 web/design/assets, fonts, slides, colors_and_type.css가 필요하므로 preview만 제외)
-web/design/preview
-
 # IDE / OS / 로그
 .vscode/
 .idea/

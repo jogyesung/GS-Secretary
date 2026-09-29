@@ -5,7 +5,7 @@ from bot.handlers.chat import needs_heavy_model
 
 @pytest.mark.parametrize("msg", [
     "24년 2월 계약서 찾아줘",
-    "프로젝트 알바트로스 표지 슬라이드 만들어줘",
+    "이 내용으로 IM 초안 작성해줘",
     "이 내용으로 이메일 초안 써줘",
     "내일 회의 일정 잡아줘",
     "드라이브에서 IM 읽고 요약해줘",

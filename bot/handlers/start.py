@@ -82,11 +82,6 @@ def _build_help_text() -> str:
             "  대화 중에도 '오늘 코스피 어때?'처럼 물으면 알아서 검색해요.\n"
         )
 
-    sections.append(
-        "**CIP 슬라이드**\n"
-        "'프로젝트 알바트로스 표지 만들어줘', '섹션 구분 슬라이드' 같이 말하면 PNG로 보내드려요.\n"
-    )
-
     try:
         from bot.services.stock_research_service import get_watchlist
         names = ", ".join(s["name"] for s in get_watchlist()) or "(STOCK_WATCHLIST 미설정)"
